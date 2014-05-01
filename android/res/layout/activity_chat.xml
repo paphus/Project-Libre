@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:gravity="fill_vertical"
+    android:orientation="vertical" >
+
+    <TextView
+        android:id="@+id/nameLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Bot"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0px"
+        android:layout_weight="1"
+        android:orientation="horizontal" >
+        
+        <ImageView
+            android:id="@+id/imageView"
+            android:layout_width="0px"
+            android:layout_height="match_parent"
+            android:scaleType="fitStart"
+            android:layout_weight="4"
+            android:adjustViewBounds="true"
+            android:src="@drawable/bot" />
+        
+        <ScrollView
+            android:id="@+id/scrollView"
+            android:layout_width="0px"
+            android:layout_height="match_parent"
+            android:layout_weight="6"
+            android:fillViewport="true"
+            android:scrollbars="vertical" >
+
+            <TextView
+                android:id="@+id/logText"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textAppearance="?android:attr/textAppearanceSmall" />
+        </ScrollView>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/responseText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" >
+
+        <EditText
+            android:id="@+id/messageText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ems="10"
+            android:hint="You say"
+            android:imeOptions="actionDone"
+            android:inputType="text" />
+
+        <ImageButton
+            android:id="@+id/speakButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="speak"
+            android:src="@android:drawable/ic_btn_speak_now" />
+        
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/properties"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+        
+    <Button
+        android:id="@+id/minimizePropertiesButton"
+        android:layout_width="32sp"
+        android:layout_height="10sp"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/arrow_down"
+        android:onClick="minimizeProperties"
+        android:adjustViewBounds="true"
+        android:text="" />
+            
+    <Spinner
+        android:id="@+id/emoteSpin"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+    
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" >
+
+        <CheckBox
+            android:id="@+id/correctionCheckbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Correction" />
+
+        <CheckBox
+            android:id="@+id/offensiveCheckbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Flag as offensive" />
+        
+    </LinearLayout>
+
+    <CheckBox
+        android:id="@+id/speakCheckbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Speak" />
+
+    <!--Button
+        android:id="@+id/disconnectButton"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="1dp"
+        android:background="@drawable/cancel_button"
+        android:onClick="disconnect"
+        android:text="Disconnect"
+        android:textColor="@color/dgrey" /-->
+    
+	</LinearLayout>
+    
+    <Button
+        android:id="@+id/maximizePropertiesButton"
+        android:layout_width="32sp"
+        android:layout_height="10sp"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/arrow_up"
+        android:onClick="maximizeProperties"
+        android:adjustViewBounds="true"
+        android:visibility="gone"
+        android:text="" />
+
+</LinearLayout>

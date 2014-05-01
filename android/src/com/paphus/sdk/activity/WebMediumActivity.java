@@ -1,0 +1,105 @@
+package com.paphus.sdk.activity;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.DialogInterface;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import com.paphus.sdk.activity.actions.HttpFlagAction;
+import com.paphus.sdk.activity.actions.HttpGetImageAction;
+import com.paphus.sdk.config.WebMediumConfig;
+
+/**
+ * Generic activity for viewing a content's details.
+ */
+@SuppressLint("DefaultLocale")
+public abstract class WebMediumActivity extends Activity {
+	@Override
+	public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+		resetView();
+	}
+	
+	@Override
+	public void onResume() {
+		resetView();
+		super.onResume();
+	}
+	
+	@Override
+	public void onPostResume() {
+		super.onPostResume();
+		
+		if (MainActivity.wasDelete) {
+			MainActivity.wasDelete = false;
+			finish();
+		}
+	}
+
+	public void resetView() {		
+        WebMediumConfig instance = MainActivity.instance;
+        
+        if (!instance.isFlagged) {
+	        findViewById(R.id.flaggedLabel).setVisibility(View.GONE);
+        } else {
+	        findViewById(R.id.imageView).setVisibility(View.GONE);        	
+        }
+        
+        TextView text = (TextView) findViewById(R.id.nameLabel);
+        text.setText(instance.name);
+        text = (TextView) findViewById(R.id.descriptionLabel);
+        text.setText(instance.description);
+        text = (TextView) findViewById(R.id.detailsLabel);
+        text.setText(instance.details);
+        text = (TextView) findViewById(R.id.disclaimerLabel);
+        text.setText(instance.disclaimer);
+        text = (TextView) findViewById(R.id.categoriesLabel);
+        if (text != null) {
+	        text.setText(instance.categories);
+        }
+        text = (TextView) findViewById(R.id.tagsLabel);
+        text.setText(instance.tags);
+        text = (TextView) findViewById(R.id.licenseLabel);
+        text.setText(instance.license);
+        text = (TextView) findViewById(R.id.creatorLabel);
+        text.setText("by " + instance.creator);
+
+        HttpGetImageAction.fetchImage(this, instance.avatar, (ImageView)findViewById(R.id.imageView));
+	}
+	
+	public abstract String getType();
+	
+	/**
+	 * Flag the instance.
+	 */
+	@SuppressLint("DefaultLocale")
+	public void flag() {
+        if (MainActivity.user == null) {
+        	MainActivity.showMessage("You must sign in to flag a " + getType().toLowerCase(), this);
+        	return;
+        }
+        final EditText text = new EditText(this);
+        MainActivity.prompt("Enter reason for flagging the " + getType().toLowerCase() + " as offensive", this, text, new DialogInterface.OnClickListener() {
+	        public void onClick(DialogInterface dialog, int whichButton) {
+	            WebMediumConfig instance = MainActivity.instance.credentials();
+	            instance.flaggedReason = text.getText().toString();
+	            if (instance.flaggedReason.trim().length() == 0) {
+	            	MainActivity.error("You must enter a valid reason for flagging the " + getType().toLowerCase(), null, WebMediumActivity.this);
+	            	return;
+	            }
+	            
+	            HttpFlagAction action = new HttpFlagAction(WebMediumActivity.this, instance);
+	        	action.execute();
+	        }
+        });
+	}
+
+	public void menu(View view) {
+		openOptionsMenu();
+	}
+	
+}
