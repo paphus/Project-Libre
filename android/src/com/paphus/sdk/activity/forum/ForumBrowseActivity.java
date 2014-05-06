@@ -14,6 +14,8 @@ import com.paphus.sdk.activity.BrowseActivity;
 import com.paphus.sdk.activity.MainActivity;
 import com.paphus.sdk.activity.actions.HttpAction;
 import com.paphus.sdk.activity.actions.HttpFetchAction;
+import com.paphus.sdk.activity.actions.HttpGetCategoriesAction;
+import com.paphus.sdk.activity.actions.HttpGetTagsAction;
 import com.paphus.sdk.config.ForumConfig;
 
 /**
@@ -46,15 +48,11 @@ public class ForumBrowseActivity extends BrowseActivity {
         });
 		sortSpin.setAdapter(adapter);
 
-		Spinner tagSpin = (Spinner) findViewById(R.id.tagSpin);
-		adapter = new ArrayAdapter(this,
-                android.R.layout.simple_spinner_dropdown_item, MainActivity.getAllForumTags(this));
-		tagSpin.setAdapter(adapter);
-
-		Spinner categorySpin = (Spinner) findViewById(R.id.categorySpin);
-		adapter = new ArrayAdapter(this,
-                android.R.layout.simple_spinner_dropdown_item, MainActivity.getAllForumCategories(this));
-		categorySpin.setAdapter(adapter);
+    	HttpAction action = new HttpGetTagsAction(this, getType());
+    	action.execute();
+    	
+    	action = new HttpGetCategoriesAction(this, getType());
+    	action.execute();
 	}
 	
 	public void resetLast() {

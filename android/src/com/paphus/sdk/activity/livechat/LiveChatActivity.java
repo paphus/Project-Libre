@@ -104,8 +104,6 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 			@Override
 		   public void onItemClick(AdapterView<?> adapter, View view, int position, long arg) {
 				UserConfig userConfig = (UserConfig)list.getItemAtPosition(position);
-				System.out.println(userConfig);
-				System.out.println(position);
 				if (userConfig != null) {
 					setText(userConfig.user + ": ");
 				}

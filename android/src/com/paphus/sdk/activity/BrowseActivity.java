@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -15,7 +16,9 @@ import android.widget.Spinner;
 import com.paphus.sdk.activity.R;
 import com.paphus.sdk.activity.actions.HttpAction;
 import com.paphus.sdk.activity.actions.HttpFetchAction;
+import com.paphus.sdk.activity.actions.HttpGetCategoriesAction;
 import com.paphus.sdk.activity.actions.HttpGetInstancesAction;
+import com.paphus.sdk.activity.actions.HttpGetTagsAction;
 import com.paphus.sdk.config.BrowseConfig;
 import com.paphus.sdk.config.InstanceConfig;
 
@@ -50,15 +53,11 @@ public class BrowseActivity extends Activity {
         });
 		sortSpin.setAdapter(adapter);
 
-		Spinner tagSpin = (Spinner) findViewById(R.id.tagSpin);
-		adapter = new ArrayAdapter(this,
-                android.R.layout.simple_spinner_dropdown_item, MainActivity.getAllTags(this));
-		tagSpin.setAdapter(adapter);
-
-		Spinner categorySpin = (Spinner) findViewById(R.id.categorySpin);
-		adapter = new ArrayAdapter(this,
-                android.R.layout.simple_spinner_dropdown_item, MainActivity.getAllCategories(this));
-		categorySpin.setAdapter(adapter);
+    	HttpAction action = new HttpGetTagsAction(this, getType());
+    	action.execute();
+    	
+    	action = new HttpGetCategoriesAction(this, getType());
+    	action.execute();
 	}
 	
 	public void resetLast() {
@@ -111,10 +110,10 @@ public class BrowseActivity extends Activity {
 		}
 		Spinner sortSpin = (Spinner)findViewById(R.id.sortSpin);
 		config.sort = (String)sortSpin.getSelectedItem();
-		Spinner tagSpin = (Spinner)findViewById(R.id.tagSpin);
-		config.tag = (String)tagSpin.getSelectedItem();
-		Spinner categorySpin = (Spinner)findViewById(R.id.categorySpin);
-		config.category = (String)categorySpin.getSelectedItem();
+		AutoCompleteTextView tagText = (AutoCompleteTextView)findViewById(R.id.tagsText);
+		config.tag = (String)tagText.getText().toString();
+		AutoCompleteTextView categoryText = (AutoCompleteTextView)findViewById(R.id.categoriesText);
+		config.category = (String)categoryText.getText().toString();
 		EditText filterEdit = (EditText)findViewById(R.id.filterText);
 		config.filter = filterEdit.getText().toString();
 		CheckBox checkbox = (CheckBox)findViewById(R.id.imagesCheckBox);

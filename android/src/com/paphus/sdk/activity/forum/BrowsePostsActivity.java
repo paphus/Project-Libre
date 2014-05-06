@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.RadioButton;
@@ -13,6 +14,7 @@ import com.paphus.sdk.activity.R;
 import com.paphus.sdk.activity.MainActivity;
 import com.paphus.sdk.activity.actions.HttpAction;
 import com.paphus.sdk.activity.actions.HttpGetPostsAction;
+import com.paphus.sdk.activity.actions.HttpGetTagsAction;
 import com.paphus.sdk.config.BrowseConfig;
 
 
@@ -42,10 +44,8 @@ public class BrowsePostsActivity extends Activity {
         });
 		sortSpin.setAdapter(adapter);
 
-		Spinner tagSpin = (Spinner) findViewById(R.id.tagSpin);
-		adapter = new ArrayAdapter(this,
-                android.R.layout.simple_spinner_dropdown_item, MainActivity.getAllForumPostTags(this));
-		tagSpin.setAdapter(adapter);
+    	HttpAction action = new HttpGetTagsAction(this, getType());
+    	action.execute();
 	}
 	
 	public void browse(View view) {
@@ -58,8 +58,8 @@ public class BrowsePostsActivity extends Activity {
 		}
 		Spinner sortSpin = (Spinner)findViewById(R.id.sortSpin);
 		config.sort = (String)sortSpin.getSelectedItem();
-		Spinner tagSpin = (Spinner)findViewById(R.id.tagSpin);
-		config.tag = (String)tagSpin.getSelectedItem();
+		AutoCompleteTextView tagText = (AutoCompleteTextView)findViewById(R.id.tagsText);
+		config.tag = (String)tagText.getText().toString();
 		EditText filterEdit = (EditText)findViewById(R.id.filterText);
 		config.filter = filterEdit.getText().toString();
 		CheckBox checkbox = (CheckBox)findViewById(R.id.imagesCheckBox);

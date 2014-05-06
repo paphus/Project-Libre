@@ -32,22 +32,16 @@ import com.paphus.sdk.SDKConnection;
 import com.paphus.sdk.activity.actions.HttpAction;
 import com.paphus.sdk.activity.actions.HttpConnectAction;
 import com.paphus.sdk.activity.actions.HttpFetchAction;
-import com.paphus.sdk.activity.actions.HttpGetCategoriesAction;
 import com.paphus.sdk.activity.actions.HttpGetImageAction;
 import com.paphus.sdk.activity.actions.HttpGetInstancesAction;
-import com.paphus.sdk.activity.actions.HttpGetTagsAction;
 import com.paphus.sdk.activity.forum.ForumBrowseActivity;
 import com.paphus.sdk.activity.livechat.ChannelBrowseActivity;
-import com.paphus.sdk.config.AvatarConfig;
-import com.paphus.sdk.config.BotModeConfig;
 import com.paphus.sdk.config.BrowseConfig;
 import com.paphus.sdk.config.ChannelConfig;
-import com.paphus.sdk.config.ContentConfig;
 import com.paphus.sdk.config.DomainConfig;
 import com.paphus.sdk.config.ForumConfig;
 import com.paphus.sdk.config.ForumPostConfig;
 import com.paphus.sdk.config.InstanceConfig;
-import com.paphus.sdk.config.LearningConfig;
 import com.paphus.sdk.config.UserConfig;
 import com.paphus.sdk.config.VoiceConfig;
 import com.paphus.sdk.config.WebMediumConfig;
@@ -86,6 +80,7 @@ public class MainActivity extends Activity {
 	 */
 	public static String domainId = null;
 	public static DomainConfig domain;
+	public static String defaultType = "Bots";
 	/**
 	 * Choose your service provider using the correct credentials.
 	 */
@@ -118,9 +113,7 @@ public class MainActivity extends Activity {
 	public static UserConfig user;
 	public static UserConfig viewUser;
 	public static String type = "Bots";
-	public static BotModeConfig botMode = new BotModeConfig();
 	public static VoiceConfig voice = new VoiceConfig();
-	public static LearningConfig learning = new LearningConfig();
 	public static String conversation;
 	public static String template = "";
 	public static Object[] templates;
@@ -134,8 +127,6 @@ public class MainActivity extends Activity {
 	public static boolean showImages = true;
 	public static List<WebMediumConfig> instances = new ArrayList<WebMediumConfig>();
 	public static List<ForumPostConfig> posts = new ArrayList<ForumPostConfig>();
-	public static List<AvatarConfig> avatars;
-	public static List<AvatarConfig> sharedAvatars;
 	public static MainActivity current;
 	public static boolean wasDelete;
 	public static String[] types = new String[]{"Bots", "Forums", "Live Chat", "Domains"};
@@ -214,111 +205,6 @@ public class MainActivity extends Activity {
 	        }
 	    });
 		dialog.show();
-	}
-	
-	public static Object[] getAllTags(Activity activity) {
-		if (tags == null) {
-		    try {
-		    	ContentConfig config = new ContentConfig();
-		    	config.type = "Bot";
-		    	HttpGetTagsAction action = new HttpGetTagsAction(activity, config);
-		    	action.postExecute(action.execute().get());
-				if (action.getException() != null) {
-					tags = new String[0];
-				}
-		    } catch (Exception ignore) {}
-		}
-		return tags;
-	}
-	
-	public static Object[] getAllForumTags(Activity activity) {
-		if (forumTags == null) {
-		    try {
-		    	ContentConfig config = new ContentConfig();
-		    	config.type = "Forum";
-		    	HttpGetTagsAction action = new HttpGetTagsAction(activity, config);
-		    	action.postExecute(action.execute().get());
-				if (action.getException() != null) {
-					forumTags = new String[0];
-				}
-		    } catch (Exception ignore) {}
-		}
-		return forumTags;
-	}
-	
-	public static Object[] getAllForumPostTags(Activity activity) {
-		if (forumPostTags == null) {
-		    try {
-		    	ContentConfig config = new ContentConfig();
-		    	config.type = "Post";
-		    	HttpGetTagsAction action = new HttpGetTagsAction(activity, config);
-		    	action.postExecute(action.execute().get());
-				if (action.getException() != null) {
-					forumPostTags = new String[0];
-				}
-		    } catch (Exception ignore) {}
-		}
-		return forumPostTags;
-	}
-	
-	public static Object[] getAllChannelTags(Activity activity) {
-		if (channelTags == null) {
-		    try {
-		    	ContentConfig config = new ContentConfig();
-		    	config.type = "Channel";
-		    	HttpGetTagsAction action = new HttpGetTagsAction(activity, config);
-		    	action.postExecute(action.execute().get());
-				if (action.getException() != null) {
-					channelTags = new String[0];
-				}
-		    } catch (Exception ignore) {}
-		}
-		return channelTags;
-	}
-	
-	public static Object[] getAllCategories(Activity activity) {
-		if (categories == null) {
-		    try {
-		    	ContentConfig config = new ContentConfig();
-		    	config.type = "Bot";
-		    	HttpGetCategoriesAction action = new HttpGetCategoriesAction(activity, config);
-		    	action.postExecute(action.execute().get());
-				if (action.getException() != null) {
-					categories = new String[0];
-				}
-		    } catch (Exception ignore) {}
-		}
-		return categories;
-	}
-	
-	public static Object[] getAllForumCategories(Activity activity) {
-		if (forumCategories == null) {
-		    try {
-		    	ContentConfig config = new ContentConfig();
-		    	config.type = "Forum";
-		    	HttpGetCategoriesAction action = new HttpGetCategoriesAction(activity, config);
-		    	action.postExecute(action.execute().get());
-				if (action.getException() != null) {
-					forumCategories = new String[0];
-				}
-		    } catch (Exception ignore) {}
-		}
-		return forumCategories;
-	}
-	
-	public static Object[] getAllChannelCategories(Activity activity) {
-		if (channelCategories == null) {
-		    try {
-		    	ContentConfig config = new ContentConfig();
-		    	config.type = "Channel";
-		    	HttpGetCategoriesAction action = new HttpGetCategoriesAction(activity, config);
-		    	action.postExecute(action.execute().get());
-				if (action.getException() != null) {
-					channelCategories = new String[0];
-				}
-		    } catch (Exception ignore) {}
-		}
-		return channelCategories;
 	}
     
 
@@ -460,7 +346,6 @@ public class MainActivity extends Activity {
 		connection.disconnect();
         user = null;
         instance = null;
-        avatars = null;
         conversation = null;
         post = null;
         posts = new ArrayList<ForumPostConfig>();
@@ -468,7 +353,6 @@ public class MainActivity extends Activity {
         domain = null;
         tags = null;
         categories= null;
-        learning = null;
         voice = null;
 
     	SharedPreferences.Editor editor = getPreferences(Context.MODE_PRIVATE).edit();
@@ -521,7 +405,7 @@ public class MainActivity extends Activity {
 		Spinner spin = (Spinner) findViewById(R.id.typeSpin);
 		type = (String)spin.getSelectedItem();
 		if (type == null) {
-			type = "Bots";
+			type = MainActivity.defaultType;
 		}
 		if (type.equals("Bots")) {
 	        Intent intent = new Intent(this, BrowseActivity.class);

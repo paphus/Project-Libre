@@ -49,10 +49,12 @@
         android:layout_height="wrap_content"
         android:text="Tag" />
     
-    <Spinner
-        android:id="@+id/tagSpin"
+    <AutoCompleteTextView
+        android:id="@+id/tagsText"
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:imeOptions="actionDone"
+        android:inputType="text" />
     
     </LinearLayout>
     

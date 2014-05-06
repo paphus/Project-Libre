@@ -31,6 +31,9 @@ public class UserConfig extends Config {
 	
 	public void addCredentials(SDKConnection connection) {
 		this.application = connection.getCredentials().getApplicationId();
+		if (connection.getDomain() != null) {
+			this.domain = connection.getDomain().id;
+		}
 	}
 
 	public void parseXML(Element element) {

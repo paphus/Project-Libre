@@ -43,7 +43,6 @@ public class UserListAdapter extends ArrayAdapter<UserConfig> {
         } else {
             holder = (ReplyImageListViewHolder) convertView.getTag();
         }
-
         holder.nameView.setText(config.user);
         if (MainActivity.showImages && config.avatar != null) {
         	HttpGetImageAction.fetchImage(this.activity, config.avatar, holder.imageView);

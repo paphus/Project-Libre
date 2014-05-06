@@ -12,6 +12,7 @@ import android.widget.EditText;
 import com.paphus.sdk.activity.R;
 import com.paphus.sdk.activity.MainActivity;
 import com.paphus.sdk.activity.actions.HttpAction;
+import com.paphus.sdk.activity.actions.HttpGetTagsAction;
 import com.paphus.sdk.activity.actions.HttpUpdateForumPostAction;
 import com.paphus.sdk.config.ForumPostConfig;
 
@@ -19,10 +20,6 @@ import com.paphus.sdk.config.ForumPostConfig;
  * Activity for editing a forum post.
  */
 public class EditForumPostActivity extends Activity {
-	
-	public Object[] getTags() {
-		return MainActivity.getAllForumPostTags(this);
-	}
 	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -32,23 +29,14 @@ public class EditForumPostActivity extends Activity {
         resetView();
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public void resetView() {
+
+    	HttpAction action = new HttpGetTagsAction(this, "Post");
+    	action.execute();
 		
 		ForumPostConfig instance = MainActivity.post;
         
         final AutoCompleteTextView tagsText = (AutoCompleteTextView)findViewById(R.id.tagsText);
-        ArrayAdapter adapter = new ArrayAdapter(this,
-                android.R.layout.select_dialog_item, getTags());
-        tagsText.setThreshold(0);
-        tagsText.setAdapter(adapter);
-        tagsText.setOnTouchListener(new View.OnTouchListener() {
-	    	   @Override
-	    	   public boolean onTouch(View v, MotionEvent event){
-	    		   tagsText.showDropDown();
-	    		   return false;
-	    	   }
-	    	});
         tagsText.setText(instance.tags);
     	
         EditText text = (EditText) findViewById(R.id.topicText);

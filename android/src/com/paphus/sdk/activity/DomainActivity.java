@@ -17,7 +17,7 @@ public class DomainActivity extends WebMediumActivity {
 	}
 
 	public void browse(View view) {
-		MainActivity.type = "Bots";
+		MainActivity.type = MainActivity.defaultType;
 		
         Intent intent = new Intent(this, MainActivity.class);
 		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
