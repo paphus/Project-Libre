@@ -24,7 +24,7 @@ package com.paphus.sdk;
  */
 public class FORUMSlibreCredentials extends Credentials {
 	public static String DOMAIN = "www.forumslibre.com";
-	//public static String DOMAIN = "192.168.0.12:9080";
+	//public static String DOMAIN = "192.168.0.15:9080";
 	public static String APP = "";
 	//public static String APP = "/forumslibre";
 	public static String PATH = "/rest/forumslibre";

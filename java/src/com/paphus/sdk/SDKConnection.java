@@ -19,7 +19,6 @@
 package com.paphus.sdk;
 
 import java.io.ByteArrayOutputStream;
-
 import java.io.StringReader;
 import java.net.URL;
 import java.util.ArrayList;
@@ -50,8 +49,6 @@ import org.xml.sax.InputSource;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
-import com.paphus.sdk.config.AvatarConfig;
-import com.paphus.sdk.config.BotModeConfig;
 import com.paphus.sdk.config.BrowseConfig;
 import com.paphus.sdk.config.ChannelConfig;
 import com.paphus.sdk.config.ChatConfig;
@@ -61,9 +58,6 @@ import com.paphus.sdk.config.DomainConfig;
 import com.paphus.sdk.config.ForumConfig;
 import com.paphus.sdk.config.ForumPostConfig;
 import com.paphus.sdk.config.InstanceConfig;
-import com.paphus.sdk.config.LearningConfig;
-import com.paphus.sdk.config.TrainingConfig;
-import com.paphus.sdk.config.UserAdminConfig;
 import com.paphus.sdk.config.UserConfig;
 import com.paphus.sdk.config.VoiceConfig;
 import com.paphus.sdk.config.WebMediumConfig;
@@ -288,49 +282,6 @@ public class SDKConnection {
 	}
 	
 	/**
-	 * Create the new content.
-	 * The content will be returned with its new id.
-	 */
-	@SuppressWarnings("unchecked")
-	public <T extends WebMediumConfig> T create(T config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/create-" + config.getType(), config.toXML());
-		Element root = parse(xml);
-		if (root == null) {
-			return null;
-		}
-		try {
-			config = (T)config.getClass().newInstance();
-			config.parseXML(root);
-			return config;
-		} catch (Exception exception) {
-			this.exception = SDKException.parseFailure(exception);
-			throw this.exception;
-		}
-	}
-	
-	/**
-	 * Update the content.
-	 */
-	@SuppressWarnings("unchecked")
-	public <T extends WebMediumConfig> T update(T config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/update-" + config.getType(), config.toXML());
-		Element root = parse(xml);
-		if (root == null) {
-			return null;
-		}
-		try {
-			config = (T)config.getClass().newInstance();
-			config.parseXML(root);
-			return config;
-		} catch (Exception exception) {
-			this.exception = SDKException.parseFailure(exception);
-			throw this.exception;
-		}
-	}
-	
-	/**
 	 * Update the forum post.
 	 */
 	public ForumPostConfig update(ForumPostConfig config) {
@@ -358,14 +309,6 @@ public class SDKConnection {
 		config.addCredentials(this);
 		POST(this.url + "/update-user", config.toXML());
 		return config;
-	}
-	
-	/**
-	 * Permanently delete the content with the id.
-	 */
-	public void delete(WebMediumConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/delete-" + config.getType(), config.toXML());
 	}
 	
 	/**
@@ -420,62 +363,6 @@ public class SDKConnection {
 			this.exception = SDKException.parseFailure(exception);
 			throw this.exception;
 		}
-	}
-	
-	/**
-	 * Return the administrators of the content.
-	 */
-	public List<String> getAdmins(WebMediumConfig config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/get-" + config.getType() + "-admins", config.toXML());
-		List<String> users = new ArrayList<String>();
-		Element root = parse(xml);
-		if (root == null) {
-			return users;
-		}
-		for (int index = 0; index < root.getChildNodes().getLength(); index++) {
-			UserConfig user = new UserConfig();
-			user.parseXML((Element)root.getChildNodes().item(index));
-			users.add(user.user);
-		}
-		return users;
-	}
-	
-	/**
-	 * Return the avatars for the bot instances.
-	 */
-	public List<AvatarConfig> getAvatars(InstanceConfig config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/get-avatars", config.toXML());
-		List<AvatarConfig> avatars = new ArrayList<AvatarConfig>();
-		Element root = parse(xml);
-		if (root == null) {
-			return avatars;
-		}
-		for (int index = 0; index < root.getChildNodes().getLength(); index++) {
-			AvatarConfig avatar = new AvatarConfig();
-			avatar.parseXML((Element)root.getChildNodes().item(index));
-			avatars.add(avatar);
-		}
-		return avatars;
-	}
-	
-	/**
-	 * Return the shared avatar images for the server.
-	 */
-	public List<AvatarConfig> getSharedAvatars() {
-		String xml = GET(this.url + "/get-shared-avatars");
-		List<AvatarConfig> avatars = new ArrayList<AvatarConfig>();
-		Element root = parse(xml);
-		if (root == null) {
-			return avatars;
-		}
-		for (int index = 0; index < root.getChildNodes().getLength(); index++) {
-			AvatarConfig config = new AvatarConfig();
-			config.parseXML((Element)root.getChildNodes().item(index));
-			avatars.add(config);
-		}
-		return avatars;
 	}
 	
 	/**
@@ -556,22 +443,6 @@ public class SDKConnection {
 	}
 	
 	/**
-	 * Return the list of bot templates.
-	 */
-	public List<String> getTemplates() {
-		String xml = GET(this.url + "/get-all-templates");
-		List<String> instances = new ArrayList<String>();
-		Element root = parse(xml);
-		if (root == null) {
-			return instances;
-		}
-		for (int index = 0; index < root.getChildNodes().getLength(); index++) {
-			instances.add(((Element)root.getChildNodes().item(index)).getAttribute("name"));
-		}
-		return instances;
-	}
-	
-	/**
 	 * Return the users for the content.
 	 */
 	public List<String> getUsers(WebMediumConfig config) {
@@ -588,130 +459,6 @@ public class SDKConnection {
 			users.add(user.user);
 		}
 		return users;
-	}
-	
-	/**
-	 * Return the channel's bot configuration.
-	 */
-	public BotModeConfig getChannelBotMode(ChannelConfig config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/get-channel-bot-mode", config.toXML());
-		Element root = parse(xml);
-		if (root == null) {
-			return null;
-		}
-		try {
-			BotModeConfig botMode = new BotModeConfig();
-			botMode.parseXML(root);
-			return botMode;
-		} catch (Exception exception) {
-			this.exception = SDKException.parseFailure(exception);
-			throw this.exception;
-		}
-	}
-	
-	/**
-	 * Save the channel's bot configuration.
-	 */
-	public void saveChannelBotMode(BotModeConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/save-channel-bot-mode", config.toXML());
-	}
-	
-	/**
-	 * Save the forum's bot configuration.
-	 */
-	public void saveForumBotMode(BotModeConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/save-forum-bot-mode", config.toXML());
-	}
-	
-	/**
-	 * Save the bot's learning configuration.
-	 */
-	public void saveLearning(LearningConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/save-learning", config.toXML());
-	}
-	
-	/**
-	 * Save the bot's voice configuration.
-	 */
-	public void saveVoice(VoiceConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/save-voice", config.toXML());
-	}
-	
-	/**
-	 * Tag the avatar with the emotions.
-	 * The avatar will then be displayed when words or sentences trigger the emotional state.
-	 */
-	public void tagAvatar(AvatarConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/tag-avatar", config.toXML());
-	}
-	
-	/**
-	 * Train the bot with a new question/response pair.
-	 */
-	public void train(TrainingConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/train-instance", config.toXML());
-	}
-	
-	/**
-	 * Perform the user administration task (add or remove users, or administrators).
-	 */
-	public void userAdmin(UserAdminConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/user-admin", config.toXML());
-	}
-	
-	/**
-	 * Delete all of the avatars for the bot.
-	 */
-	public void deleteAllAvatars(InstanceConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/delete-all-avatars", config.toXML());
-	}
-	
-	/**
-	 * Delete the avatar from the bot.
-	 */
-	public void deleteAvatar(AvatarConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/delete-avatar", config.toXML());
-	}
-	
-	/**
-	 * Add the new avatar to the bot.
-	 * The file will be uploaded to the server.
-	 */
-	public void addAvatar(String file, InstanceConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/add-avatar", file, config.toXML());
-	}
-	
-	/**
-	 * Update the contents icon.
-	 * The file will be uploaded to the server.
-	 */
-	@SuppressWarnings("unchecked")
-	public <T extends WebMediumConfig> T updateIcon(String file, T config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/update-" + config.getType() + "-icon", file, config.toXML());
-		Element root = parse(xml);
-		if (root == null) {
-			return null;
-		}
-		try {
-			config = (T)config.getClass().newInstance();
-			config.parseXML(root);
-			return config;
-		} catch (Exception exception) {
-			this.exception = SDKException.parseFailure(exception);
-			throw this.exception;
-		}
 	}
 	
 	/**
@@ -807,26 +554,6 @@ public class SDKConnection {
 	 }
 	
 	/**
-	 * Return the forum's bot configuration.
-	 */
-	public BotModeConfig getForumBotMode(ForumConfig config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/get-forum-bot-mode", config.toXML());
-		Element root = parse(xml);
-		if (root == null) {
-			return null;
-		}
-		try {
-			BotModeConfig botMode = new BotModeConfig();
-			botMode.parseXML(root);
-			return botMode;
-		} catch (Exception exception) {
-			this.exception = SDKException.parseFailure(exception);
-			throw this.exception;
-		}
-	}
-	
-	/**
 	 * Return the bot's voice configuration.
 	 */
 	public VoiceConfig getVoice(InstanceConfig config) {
@@ -840,60 +567,6 @@ public class SDKConnection {
 			VoiceConfig voice = new VoiceConfig();
 			voice.parseXML(root);
 			return voice;
-		} catch (Exception exception) {
-			this.exception = SDKException.parseFailure(exception);
-			throw this.exception;
-		}
-	}
-	
-	/**
-	 * Return the bot's default responses.
-	 */
-	public List<String> getDefaultResponses(InstanceConfig config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/get-default-responses", config.toXML());
-		List<String> defaultResponses = new ArrayList<String>();
-		Element root = parse(xml);
-		if (root == null) {
-			return defaultResponses;
-		}
-		for (int index = 0; index < root.getChildNodes().getLength(); index++) {
-			defaultResponses.add(((Element)root.getChildNodes().item(index)).getChildNodes().item(0).getTextContent());
-		}
-		return defaultResponses;
-	}
-	
-	/**
-	 * Return the bot's greetings.
-	 */
-	public List<String> getGreetings(InstanceConfig config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/get-greetings", config.toXML());
-		List<String> greetings = new ArrayList<String>();
-		Element root = parse(xml);
-		if (root == null) {
-			return greetings;
-		}
-		for (int index = 0; index < root.getChildNodes().getLength(); index++) {
-			greetings.add(((Element)root.getChildNodes().item(index)).getChildNodes().item(0).getTextContent());
-		}
-		return greetings;
-	}
-	
-	/**
-	 * Return the bot's learning configuration.
-	 */
-	public LearningConfig getLearning(InstanceConfig config) {
-		config.addCredentials(this);
-		String xml = POST(this.url + "/get-learning", config.toXML());
-		Element root = parse(xml);
-		if (root == null) {
-			return null;
-		}
-		try {
-			LearningConfig learning = new LearningConfig();
-			learning.parseXML(root);
-			return learning;
 		} catch (Exception exception) {
 			this.exception = SDKException.parseFailure(exception);
 			throw this.exception;
@@ -940,53 +613,10 @@ public class SDKConnection {
 	}
 	
 	/**
-	 * Add the shared avatar to the bot's avatars.
-	 */
-	public void addSharedAvatar(AvatarConfig config) {
-		config.addCredentials(this);
-		POST(this.url + "/add-shared-avatar", config.toXML());
-	}
-	
-	/**
 	 * Return the list of content types.
 	 */
 	public String[] getTypes() {
 		return types;
-	}
-	
-	/**
-	 * Return the channel types.
-	 */
-	public String[] getChannelTypes() {
-		return channelTypes;
-	}
-	
-	/**
-	 * Return the access mode types.
-	 */
-	public String[] getAccessModes() {
-		return accessModes;
-	}
-	
-	/**
-	 * Return the learning mode types.
-	 */
-	public String[] getLearningModes() {
-		return learningModes;
-	}
-	
-	/**
-	 * Return the correction mode types.
-	 */
-	public String[] getCorrectionModes() {
-		return correctionModes;
-	}
-	
-	/**
-	 * Return the bot mode types.
-	 */
-	public String[] getBotModes() {
-		return botModes;
 	}
 	
 	/**

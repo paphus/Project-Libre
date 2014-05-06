@@ -23,10 +23,10 @@ package com.paphus.sdk;
  * http://www.botlibre.com
  */
 public class BOTlibreCredentials extends Credentials {
-	//public static String DOMAIN = "www.botlibre.com";
-	public static String DOMAIN = "192.168.0.11:9080";
-	//public static String APP = "";
-	public static String APP = "/botlibre";
+	public static String DOMAIN = "www.botlibre.com";
+	//public static String DOMAIN = "192.168.0.11:9080";
+	public static String APP = "";
+	//public static String APP = "/botlibre";
 	public static String PATH = "/rest/botlibre";
 
 	public BOTlibreCredentials(String applicationId) {
