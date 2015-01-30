@@ -18,7 +18,6 @@
 
 package com.paphus.sdk;
 
-import com.paphus.sdk.activity.MainActivity;
 import com.paphus.sdk.config.ChannelConfig;
 import com.paphus.sdk.config.UserConfig;
 
@@ -27,7 +26,7 @@ import de.tavendo.autobahn.WebSocketConnectionHandler;
 
 /**
  * Connection class for a Live Chat, or chatroom connection.
- * A live chat connection is different than an SQKConnection as it is asynchronous,
+ * A live chat connection is different than an SDKConnection as it is asynchronous,
  * and uses web sockets for communication.
  */
 public class LiveChatConnection {
@@ -63,7 +62,7 @@ public class LiveChatConnection {
 						+ "/live/chat", new WebSocketConnectionHandler() {
 				@Override
 				public void onOpen() {
-					if (MainActivity.user == null) {
+					if (LiveChatConnection.this.user == null) {
 						LiveChatConnection.this.socket.sendTextMessage("connect " + LiveChatConnection.this.channel.id + " " + LiveChatConnection.this.credentials.applicationId);
 					} else {
 						LiveChatConnection.this.socket.sendTextMessage(

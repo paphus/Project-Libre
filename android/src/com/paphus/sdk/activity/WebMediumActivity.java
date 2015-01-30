@@ -43,15 +43,15 @@ public abstract class WebMediumActivity extends Activity {
 	public void resetView() {		
         WebMediumConfig instance = MainActivity.instance;
         
+        setTitle(instance.name);
+        
         if (!instance.isFlagged) {
 	        findViewById(R.id.flaggedLabel).setVisibility(View.GONE);
         } else {
 	        findViewById(R.id.imageView).setVisibility(View.GONE);        	
         }
         
-        TextView text = (TextView) findViewById(R.id.nameLabel);
-        text.setText(instance.name);
-        text = (TextView) findViewById(R.id.descriptionLabel);
+        TextView text = (TextView) findViewById(R.id.descriptionLabel);
         text.setText(instance.description);
         text = (TextView) findViewById(R.id.detailsLabel);
         text.setText(instance.details);

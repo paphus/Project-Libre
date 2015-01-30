@@ -58,6 +58,12 @@ public class ChannelBrowseActivity extends BrowseActivity {
 	
 	public void resetLast() {
 		Button button = (Button)findViewById(R.id.lastButton);
+		if (button == null) {
+			return;
+		}
+		if (MainActivity.current == null) {
+			return;
+		}
     	SharedPreferences cookies = MainActivity.current.getPreferences(Context.MODE_PRIVATE);
     	String last = cookies.getString("channel", null);
     	if (last != null) {

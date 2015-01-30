@@ -18,13 +18,6 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" >
 
-            <TextView
-                android:id="@+id/userLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="User"
-                android:textAppearance="?android:attr/textAppearanceLarge" />
-
             <EditText
                 android:id="@+id/passwordText"
                 android:layout_width="match_parent"

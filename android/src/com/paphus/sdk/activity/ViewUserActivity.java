@@ -36,6 +36,8 @@ public class ViewUserActivity extends CreateUserActivity {
         	return;
         }
         
+        setTitle(user.name);
+        
         TextView text = (TextView) findViewById(R.id.userText);
         text.setText(user.user);
         text = (TextView) findViewById(R.id.nameText);
@@ -144,7 +146,7 @@ public class ViewUserActivity extends CreateUserActivity {
 			return;
 		}
 		try {
-			String file = MainActivity.getRealPathFromURI(this, data.getData());
+			String file = MainActivity.getFilePathFromURI(this, data.getData());
 			HttpAction action = new HttpChangeUserIconAction(this, file, MainActivity.user);
 			action.execute().get();
     		if (action.getException() != null) {

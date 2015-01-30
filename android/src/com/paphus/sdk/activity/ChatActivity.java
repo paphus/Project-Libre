@@ -49,8 +49,7 @@ public class ChatActivity extends Activity implements TextToSpeech.OnInitListene
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        TextView text = (TextView) findViewById(R.id.nameLabel);
-        text.setText(MainActivity.instance.name);
+        setTitle(MainActivity.instance.name);
         
         tts = new TextToSpeech(this, this);
         

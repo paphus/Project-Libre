@@ -3,6 +3,8 @@ package com.paphus.sdk.activity;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -18,6 +20,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.webkit.MimeTypeMap;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -64,6 +67,10 @@ import com.paphus.sdk.config.WebMediumConfig;
 public class MainActivity extends Activity {
 	public static final boolean DEBUG = false;
 	public static final boolean ADULT = false;
+	
+	public static Pattern httpRegex = Pattern.compile("\\b(?:https?|ftp|file):\\/\\/[a-z0-9-+&@#\\/%?=~_|!:,.;]*[a-z0-9-+&@#\\/%=~_|]", Pattern.CASE_INSENSITIVE);
+	public static Pattern wwwRegex = Pattern.compile("((www\\.)[^\\s]+)", Pattern.CASE_INSENSITIVE);
+	public static Pattern emailRegex = Pattern.compile("(([a-zA-Z0-9_\\-\\.]+)@[a-zA-Z_]+?(?:\\.[a-zA-Z]{2,6}))+", Pattern.CASE_INSENSITIVE);
 	
 	/**
 	 * Enter your application ID here.
@@ -138,19 +145,99 @@ public class MainActivity extends Activity {
 
 	Menu menu;
 
-	public static String getRealPathFromURI(Context context, Uri uri) {
-		Cursor cursor = null;
-		try {
-			String[] proj = { MediaStore.Images.Media.DATA };
-			cursor = context.getContentResolver().query(uri, proj, null, null, null);
-			int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-			cursor.moveToFirst();
-			return cursor.getString(column_index);
-		} finally {
-			if (cursor != null) {
-				cursor.close();
+	public static String getFilePathFromURI(Context context, Uri uri) {
+		String scheme = uri.getScheme();
+		if (scheme.equals("file")) {
+		    return uri.getPath(); // uri.getLastPathSegment();
+		} else if (scheme.equals("content")) {
+			Cursor cursor = null;
+			try {
+				//String selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "="
+				//        + MediaStore.Files.FileColumns.MEDIA_TYPE_NONE;
+				//String i = MediaStore.Files.FileColumns.DATA;
+				String[] proj = { MediaStore.Images.Media.DATA };
+				cursor = context.getContentResolver().query(uri, proj, null, null, null);
+				int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+				cursor.moveToFirst();
+				String path = cursor.getString(column_index);
+				if (path == null) {
+					return uri.getPath();
+				}
+				return path;
+			} finally {
+				if (cursor != null) {
+					cursor.close();
+				}
 			}
+	    } else {
+	    	return uri.getPath();
+	    }
+	}
+
+	public static String getFileNameFromPath(String path) {
+		int index = path.lastIndexOf("/");
+		return path.substring(index + 1, path.length());
+	}
+
+	public static String getFileTypeFromPath(String path) {
+		int index = path.lastIndexOf(".");
+		String ext = path.substring(index + 1, path.length());
+		return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+	}
+	
+	public static String linkHTML(String text) {
+		if (text == null || text.length() == 0) {
+			return "";
 		}
+		boolean http = text.indexOf("http") != -1;
+		boolean www = text.indexOf("www.") != -1;
+		boolean email = text.indexOf("@") != -1;
+		if (!http && !www && !email) {
+			return text;
+		}
+		if (text.indexOf("<") != -1 && text.indexOf(">") != -1) {
+			return text;
+		}
+		if (http) {
+			Matcher matcher = httpRegex.matcher(text);
+			StringBuffer sb = new StringBuffer();
+			while (matcher.find()) {
+				String url = matcher.group();
+		    	if (url.indexOf(".png") != -1 || url.indexOf(".jpg") != -1 || url.indexOf(".jpeg") != -1 || url.indexOf(".gif") != -1) {
+		    		url = "<a href='" + url + "' target='_blank'><img src='" + url + "' height='50'></a>";
+		    	} else if (url.indexOf(".mp4") != -1 || url.indexOf(".webm") != -1 || url.indexOf(".ogg") != -1) {
+		    		url = "<a href='" + url + "' target='_blank'><video src='" + url + "' height='50'></a>";
+		    	} else if (url.indexOf(".wav") != -1 || url.indexOf(".mp3") != -1) {
+		    		url = "<a href='" + url + "' target='_blank'><audio src='" + url + "' controls>audio</a>";
+		    	} else {
+		    		url = "<a href='" + url + "' target='_blank'>" + url + "</a>";
+		    	}
+				matcher.appendReplacement(sb, url);
+			}
+			matcher.appendTail(sb);
+			text = sb.toString();
+		} else if (www) {
+			Matcher matcher = wwwRegex.matcher(text);
+			StringBuffer sb = new StringBuffer();
+			while (matcher.find()) {
+				String url = matcher.group();
+				matcher.appendReplacement(sb, "<a href='http://" + url + "' target='_blank'>" + url + "</a>");
+			}
+			matcher.appendTail(sb);
+			text = sb.toString();
+		}
+		
+		if (email) {
+			Matcher matcher = emailRegex.matcher(text);
+			StringBuffer sb = new StringBuffer();
+			while (matcher.find()) {
+				String address = matcher.group();
+				matcher.appendReplacement(sb, "<a href='mailto://" + address + "' target='_blank'>" + address + "</a>");
+			}
+			matcher.appendTail(sb);
+			text = sb.toString();
+		}
+		return text;
 	}
 	
 	public static void error(String message, Exception exception, Activity activity) {
@@ -253,6 +340,17 @@ public class MainActivity extends Activity {
 			setTitle(domain.name);
 	        HttpGetImageAction.fetchImage(this, domain.avatar, (ImageView)findViewById(R.id.splash));			
 		}
+        if (MainActivity.user == null) {
+        	findViewById(R.id.logoutButton).setEnabled(false);
+        	findViewById(R.id.logoutButton).setBackgroundResource(R.drawable.logout2);
+        	findViewById(R.id.loginButton).setEnabled(true);
+        	findViewById(R.id.loginButton).setBackgroundResource(R.drawable.login);
+        } else {
+        	findViewById(R.id.logoutButton).setEnabled(true);
+        	findViewById(R.id.logoutButton).setBackgroundResource(R.drawable.logout);
+        	findViewById(R.id.loginButton).setEnabled(false);
+        	findViewById(R.id.loginButton).setBackgroundResource(R.drawable.login2);
+        }
 		resetMenu();
 	}
 	
@@ -260,7 +358,7 @@ public class MainActivity extends Activity {
 	public void onResume() {
 		if (user != null) {
 			resetView();
-	    	
+			
 	    	SharedPreferences.Editor cookies = getPreferences(Context.MODE_PRIVATE).edit();
 	    	cookies.putString("user", MainActivity.user.user);
 	    	cookies.putString("token", MainActivity.user.token);
@@ -326,6 +424,14 @@ public class MainActivity extends Activity {
             return super.onOptionsItemSelected(item);
         }
     }
+
+	public void login(View view) {
+		login();
+	}
+
+	public void logout(View view) {
+		logout();
+	}
 
 	public void login() {
 		Spinner spin = (Spinner) findViewById(R.id.typeSpin);

@@ -8,10 +8,10 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Bundle;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
-import android.text.Html;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.KeyEvent;
@@ -20,7 +20,10 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.AdapterView;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -36,9 +39,12 @@ import com.paphus.sdk.activity.MainActivity;
 import com.paphus.sdk.activity.R;
 import com.paphus.sdk.activity.ViewUserActivity;
 import com.paphus.sdk.activity.actions.HttpAction;
+import com.paphus.sdk.activity.actions.HttpCreateChannelFileAttachmentAction;
+import com.paphus.sdk.activity.actions.HttpCreateChannelImageAttachmentAction;
 import com.paphus.sdk.activity.actions.HttpGetImageAction;
 import com.paphus.sdk.activity.actions.HttpGetLiveChatUsersAction;
 import com.paphus.sdk.config.ChannelConfig;
+import com.paphus.sdk.config.MediaConfig;
 import com.paphus.sdk.config.UserConfig;
 import com.paphus.sdk.config.VoiceConfig;
 import com.paphus.sdk.config.WebMediumConfig;
@@ -53,17 +59,24 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
     protected TextToSpeech tts;
     protected LiveChatConnection connection;
     protected EditText textView;
-    protected boolean speak = true;
-    protected boolean chime = false;
+    protected boolean speak = false;
+    protected boolean chime = true;
     protected MediaPlayer chimePlayer;
+    protected String childActivity = "";
+    protected long startTime;
     
     public String html = "";
 	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        startTime = System.currentTimeMillis();
+        
         setContentView(R.layout.activity_livechat);
 
+        setTitle(MainActivity.instance.name);
+        
         TextView text = (TextView) findViewById(R.id.nameLabel);
         text.setText(MainActivity.instance.name);
         
@@ -77,6 +90,30 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 				return false;
 			}
 		});
+
+        WebView webView = (WebView) findViewById(R.id.responseText);
+        webView.setWebViewClient(new WebViewClient() {
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            	try {
+            		view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            	} catch (Exception failed) {
+            		return false;
+            	}
+                return true;
+            }
+        });
+
+        webView = (WebView) findViewById(R.id.logText);
+        webView.setWebViewClient(new WebViewClient() {
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            	try {
+            		view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            	} catch (Exception failed) {
+            		return false;
+            	}
+                return true;
+            }
+        });
 
 		ImageButton  button = (ImageButton) findViewById(R.id.speakButton);
 		button.setOnClickListener(new View.OnClickListener() { 
@@ -126,7 +163,7 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 			}
 		};
 		final GestureDetector detector = new GestureDetector(this, listener);
-		findViewById(R.id.scrollView).setOnTouchListener(new View.OnTouchListener() {			
+		findViewById(R.id.logText).setOnTouchListener(new View.OnTouchListener() {			
 			@Override
 			public boolean onTouch(View v, MotionEvent event) {
 				return detector.onTouchEvent(event);
@@ -171,20 +208,49 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 	@Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
- 
-        switch (requestCode) {
-        case RESULT_SPEECH: {
-            if (resultCode == RESULT_OK && null != data) {
- 
-                ArrayList<String> text = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
- 
-                textView.setText(text.get(0));
-                submitChat();
-            }
-            break;
-        }
- 
-        }
+        
+		if (this.childActivity.equals("")) {
+	        if (requestCode == RESULT_SPEECH) {
+	            if (resultCode == RESULT_OK && null != data) {
+	 
+	                ArrayList<String> text = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+	                if (text != null) {
+	                	textView.setText(text.get(0));
+	                	submitChat();
+	                }
+	            }
+	            return;
+	        }
+	        return;
+		}
+        
+	    if (resultCode != RESULT_OK) {
+			return;
+		}
+	    if (data == null || data.getData() == null) {
+			this.childActivity = "";
+			return;
+		}
+	    
+		try {
+			String file = MainActivity.getFilePathFromURI(this, data.getData());
+			MediaConfig config = new MediaConfig();
+			config.name = MainActivity.getFileNameFromPath(file);
+			config.type = MainActivity.getFileTypeFromPath(file);
+			config.instance = MainActivity.instance.id;
+			if (this.childActivity.equals("sendImage")) {
+				HttpAction action = new HttpCreateChannelImageAttachmentAction(this, file, config);
+				action.execute().get();
+			} else {
+				HttpAction action = new HttpCreateChannelFileAttachmentAction(this, file, config);
+				action.execute().get();				
+			}
+			this.childActivity = "";
+		} catch (Exception exception) {
+			this.childActivity = "";
+			MainActivity.error(exception.getMessage(), exception, this);
+			return;
+		}
     }
 
 	public void submitChat() {
@@ -208,6 +274,35 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 		this.connection.sendMessage(text);
 	}
 
+	public void sendFile() {
+		Intent upload = new Intent(Intent.ACTION_GET_CONTENT);
+		upload.setType("file/*");
+		this.childActivity = "sendFile";
+		try {
+			startActivityForResult(upload, 1);
+		} catch (Exception notFound) {
+			this.childActivity = "sendFile";
+			upload = new Intent(Intent.ACTION_GET_CONTENT);
+			upload.setType("*/*");
+			startActivityForResult(upload, 1);
+		}
+	}
+
+	public void sendImage() {
+		Intent upload = new Intent(Intent.ACTION_GET_CONTENT);
+		upload.setType("image/*");
+		this.childActivity = "sendImage";
+		startActivityForResult(upload, 1);
+	}
+	
+	public void sendFile(MediaConfig media) {
+		String message = "file: " + media.name + " : " + media.type + " : http://"
+					+ MainActivity.connection.getCredentials().host + MainActivity.connection.getCredentials().app + "/" + media.file;
+		setText(message);
+		this.connection.sendMessage(message);
+		setText("");
+	}
+	
 	public void whisper(UserConfig user) {
 		if (user == null) {
 			setText("whisper: ");
@@ -243,6 +338,46 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
     	TextView log = (TextView) findViewById(R.id.logText);
 		log.setText("");
     }
+
+	public void menu(View view) {
+		openOptionsMenu();
+	}
+
+	public void sendFile(View view) {
+		sendFile();
+	}
+
+	public void sendImage(View view) {
+		sendImage();
+	}
+
+	public void exit(View view) {
+    	this.connection.exit();
+	}
+
+	public void accept(View view) {
+    	this.connection.accept();
+	}
+
+	public void chime(View view) {
+    	this.chime = !this.chime;
+    	Button button = (Button) findViewById(R.id.chimeButton);
+    	if (this.chime) {
+    		button.setBackgroundResource(R.drawable.sound);
+    	} else {
+    		button.setBackgroundResource(R.drawable.mute);    		
+    	}
+	}
+
+	public void speech(View view) {
+    	this.speak = !this.speak;
+    	Button button = (Button) findViewById(R.id.speechButton);
+    	if (this.speak) {
+    		button.setBackgroundResource(R.drawable.voice);
+    	} else {
+    		button.setBackgroundResource(R.drawable.voiceoff);    		
+    	}
+	}
  
     @Override
     public void onDestroy() {    	
@@ -324,8 +459,8 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
     public void clearLog() {
     	this.html = "";
     	
-		TextView log = (TextView) findViewById(R.id.logText);
-    	log.setText("");
+    	WebView log = (WebView) findViewById(R.id.logText);
+		log.loadDataWithBaseURL(null, "", "text/html", "utf-8", null);
     }
     
     public void response(String text) {
@@ -342,19 +477,23 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 			return;
 		}
 		
-		TextView responseView = (TextView) findViewById(R.id.responseText);
-		responseView.setText(text);
+		WebView responseView = (WebView) findViewById(R.id.responseText);
+		responseView.loadDataWithBaseURL(null, MainActivity.linkHTML(text), "text/html", "utf-8", null);
 		    	
-		TextView log = (TextView) findViewById(R.id.logText);
-		this.html = this.html + "<b>" + user + "</b><br/>"  + message + "<br/>";
-		log.setText(Html.fromHtml(this.html));
+		WebView log = (WebView) findViewById(R.id.logText);
+		this.html = this.html + "<b>" + user + "</b><br/>"  + MainActivity.linkHTML(message) + "<br/>";
+		log.loadDataWithBaseURL(null, this.html, "text/html", "utf-8", null);
 		
 		final ScrollView scroll = (ScrollView) findViewById(R.id.scrollView);
-		scroll.post(new Runnable() {
+		scroll.postDelayed(new Runnable() {
 		    public void run() {
 		    	scroll.fullScroll(View.FOCUS_DOWN);
 		    }
-		});
+		}, 200);
+		
+		if ((System.currentTimeMillis() - startTime) < (1000 * 5)) {
+	    	return;
+		}
 				
 		boolean speak = this.speak;
 		boolean chime = this.chime;
@@ -374,6 +513,9 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 		if (speak) {
 			this.tts.speak(message, TextToSpeech.QUEUE_FLUSH, null);
 		} else if (chime) {
+			if (this.chimePlayer != null && this.chimePlayer.isPlaying()) {
+				return;
+			}
 			chime();
 		}
     }
@@ -382,10 +524,6 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 		ListView list = (ListView) findViewById(R.id.usersList);
 		list.setAdapter(new UserListAdapter(this, R.id.usersList, users));
     }
-
-	public void menu(View view) {
-		openOptionsMenu();
-	}
 	
 	@Override
     public boolean onCreateOptionsMenu(Menu menu)
@@ -401,7 +539,7 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
         
         boolean isAdmin = (MainActivity.user != null) && instance.isAdmin;
         if (!isAdmin) {
-    	    menu.getItem(4).setEnabled(false);
+        	menu.findItem(R.id.menuBoot).setEnabled(false);
         }
         if (this.speak) {
     	    menu.findItem(R.id.menuSpeak).setChecked(true);        	
@@ -415,7 +553,13 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 		ListView list = (ListView) findViewById(R.id.usersList);
 		UserConfig user = (UserConfig)list.getItemAtPosition(list.getCheckedItemPosition());
         switch (item.getItemId())
-        {        
+        {
+	    case R.id.menuSendImage:
+	    	sendImage();
+	        return true;
+	    case R.id.menuSendFile:
+	    	sendFile();
+	        return true;
 	    case R.id.menuPing:
 	    	this.connection.ping();
 	        return true;

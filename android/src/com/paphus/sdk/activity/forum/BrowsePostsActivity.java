@@ -28,6 +28,8 @@ public class BrowsePostsActivity extends Activity {
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_browse_posts);
+		
+        setTitle("Browse Posts: " + MainActivity.instance.name);
 
 		CheckBox checkbox = (CheckBox)findViewById(R.id.imagesCheckBox);
 		checkbox.setChecked(MainActivity.showImages);

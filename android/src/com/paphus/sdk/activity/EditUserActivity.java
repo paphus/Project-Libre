@@ -21,9 +21,9 @@ public class EditUserActivity extends CreateUserActivity {
 
         UserConfig user = MainActivity.user;
         
-        TextView text = (TextView) findViewById(R.id.userLabel);
-        text.setText(user.user);
-        text = (EditText) findViewById(R.id.hintText);
+        setTitle("Edit: " + user.name);
+        
+        TextView text = (EditText) findViewById(R.id.hintText);
         text.setText(user.hint);
         text = (EditText) findViewById(R.id.nameText);
         text.setText(user.name);

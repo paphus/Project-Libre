@@ -19,6 +19,8 @@
 package com.paphus.sdk;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.StringReader;
 import java.net.URL;
 import java.util.ArrayList;
@@ -58,13 +60,14 @@ import com.paphus.sdk.config.DomainConfig;
 import com.paphus.sdk.config.ForumConfig;
 import com.paphus.sdk.config.ForumPostConfig;
 import com.paphus.sdk.config.InstanceConfig;
+import com.paphus.sdk.config.MediaConfig;
 import com.paphus.sdk.config.UserConfig;
 import com.paphus.sdk.config.VoiceConfig;
 import com.paphus.sdk.config.WebMediumConfig;
 
 /**
  * Connection class for a REST service connection.
- * The SDK connection give you access to the paphus or libre server services using a REST API.
+ * The SDK connection gives you access to the paphus or libre server services using a REST API.
  * <p>
  * The services include:
  * <ul>
@@ -232,6 +235,46 @@ public class SDKConnection {
 			ForumPostConfig post = new ForumPostConfig();
 			post.parseXML(root);
 			return post;
+		} catch (Exception exception) {
+			this.exception = SDKException.parseFailure(exception);
+			throw this.exception;
+		}
+	}
+
+	/**
+	 * Create a new file/image/media attachment for a chat channel.
+	 */
+	public MediaConfig createChannelFileAttachment(String file, MediaConfig config) {
+		config.addCredentials(this);
+		String xml = POSTFILE(this.url + "/create-channel-attachment", file, config.name, config.toXML());
+		Element root = parse(xml);
+		if (root == null) {
+			return null;
+		}
+		try {
+			MediaConfig media = new MediaConfig();
+			media.parseXML(root);
+			return media;
+		} catch (Exception exception) {
+			this.exception = SDKException.parseFailure(exception);
+			throw this.exception;
+		}
+	}
+
+	/**
+	 * Create a new file/image/media attachment for a chat channel.
+	 */
+	public MediaConfig createChannelImageAttachment(String file, MediaConfig config) {
+		config.addCredentials(this);
+		String xml = POSTIMAGE(this.url + "/create-channel-attachment", file, config.name, config.toXML());
+		Element root = parse(xml);
+		if (root == null) {
+			return null;
+		}
+		try {
+			MediaConfig media = new MediaConfig();
+			media.parseXML(root);
+			return media;
 		} catch (Exception exception) {
 			this.exception = SDKException.parseFailure(exception);
 			throw this.exception;
@@ -467,7 +510,7 @@ public class SDKConnection {
 	 */
 	public UserConfig updateIcon(String file, UserConfig config) {
 		config.addCredentials(this);
-		String xml = POST(this.url + "/update-user-icon", file, config.toXML());
+		String xml = POSTIMAGE(this.url + "/update-user-icon", file, "image.jpg", config.toXML());
 		Element root = parse(xml);
 		if (root == null) {
 			return null;
@@ -482,7 +525,7 @@ public class SDKConnection {
 		}
 	}
 	
-	protected String POST(String url, String file, String xml) {
+	protected String POSTIMAGE(String url, String file, String name, String xml) {
 		if (this.debug) {
 			System.out.println("POST: " + url);
 			System.out.println("file: " + file);
@@ -494,7 +537,58 @@ public class SDKConnection {
 	        ByteArrayOutputStream stream = new ByteArrayOutputStream();
 	        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream);
 	        byte[] byte_arr = stream.toByteArray();
-	        ByteArrayBody fileBody = new ByteArrayBody(byte_arr, "image.jpg");
+	        ByteArrayBody fileBody = new ByteArrayBody(byte_arr, name);
+	
+	        MultipartEntity multipartEntity = new MultipartEntity(HttpMultipartMode.BROWSER_COMPATIBLE);
+	
+	        multipartEntity.addPart("file", fileBody);
+	        multipartEntity.addPart("xml", new StringBody(xml));
+	
+	        HttpClient httpclient = new DefaultHttpClient();
+	        HttpResponse response = null;
+
+            HttpPost httppost = new HttpPost(url);
+            httppost.setEntity(multipartEntity);
+            response = httpclient.execute(httppost);
+			
+			HttpEntity entity = response.getEntity();
+			if (entity != null) {
+				result = EntityUtils.toString(entity, HTTP.UTF_8);
+			}
+
+			if ((response.getStatusLine().getStatusCode() != 200) && (response.getStatusLine().getStatusCode() != 204)) {
+				this.exception = new SDKException(""
+				   + response.getStatusLine().getStatusCode()
+				   + " : " + result);
+	 			throw this.exception;
+			}
+
+        } catch (Exception exception) {
+ 			this.exception = new SDKException(exception);
+ 			throw this.exception;
+ 		}
+ 		return result;
+	}
+	
+	protected String POSTFILE(String url, String path, String name, String xml) {
+		if (this.debug) {
+			System.out.println("POST: " + url);
+			System.out.println("file: " + path);
+			System.out.println("XML: " + xml);
+		}
+		String result = "";
+		try {
+			File file = new File(path);
+			FileInputStream stream = new FileInputStream(file);
+			ByteArrayOutputStream output = new ByteArrayOutputStream();
+			int read = 0;
+	        byte[] buffer = new byte[4096];
+	        while ((read = stream.read(buffer)) != -1 ) {
+	        	output.write(buffer, 0, read);
+	        }
+	        byte[] byte_arr = output.toByteArray();
+	        stream.close();
+	        ByteArrayBody fileBody = new ByteArrayBody(byte_arr, name);
 	
 	        MultipartEntity multipartEntity = new MultipartEntity(HttpMultipartMode.BROWSER_COMPATIBLE);
 	

@@ -26,8 +26,15 @@ public class UserConfig extends Config {
 	public String bots;
 	public String posts;
 	public String messages;
+	public String forums;
+	public String scripts;
+	public String avatars;
+	public String domains;
+	public String channels;
+	
 	public String joined;
 	public String lastConnect;
+
 	
 	public void addCredentials(SDKConnection connection) {
 		this.application = connection.getCredentials().getApplicationId();
@@ -48,6 +55,9 @@ public class UserConfig extends Config {
 		this.bots = element.getAttribute("bots");
 		this.posts = element.getAttribute("posts");
 		this.messages = element.getAttribute("messages");
+		this.avatars = element.getAttribute("avatars");
+		this.scripts = element.getAttribute("scripts");
+		this.domains = element.getAttribute("domains");
 		this.joined = element.getAttribute("joined");
 		this.lastConnect = element.getAttribute("lastConnect");
 		

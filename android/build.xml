@@ -1,4 +1,4 @@
-<project name="Pandora" default="dist" basedir=".">
+<project name="libre-sdk" default="dist" basedir=".">
 	<!-- set global properties for this build -->
 	<property name="source" location="src"/>
 	<property name="build" location="bin/classes"/>

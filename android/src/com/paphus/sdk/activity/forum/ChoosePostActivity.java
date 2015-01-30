@@ -26,6 +26,8 @@ public class ChoosePostActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_choosepost);
 		
+        setTitle("Posts: " + MainActivity.instance.name);
+		
 		this.instances = MainActivity.posts;
 
 		ListView list = (ListView) findViewById(R.id.instancesList);

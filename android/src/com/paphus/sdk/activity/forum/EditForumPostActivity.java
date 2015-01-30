@@ -2,15 +2,13 @@ package com.paphus.sdk.activity.forum;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.view.MotionEvent;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.CheckBox;
 import android.widget.EditText;
 
-import com.paphus.sdk.activity.R;
 import com.paphus.sdk.activity.MainActivity;
+import com.paphus.sdk.activity.R;
 import com.paphus.sdk.activity.actions.HttpAction;
 import com.paphus.sdk.activity.actions.HttpGetTagsAction;
 import com.paphus.sdk.activity.actions.HttpUpdateForumPostAction;

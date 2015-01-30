@@ -7,9 +7,8 @@
 
     <ImageView
         android:id="@+id/imageView"
-        android:layout_width="64sp"
-        android:layout_height="wrap_content"
-        android:scaleType="fitStart"
+        android:layout_width="50sp"
+        android:layout_height="50sp"
         android:adjustViewBounds="true"/>
   
     <TextView

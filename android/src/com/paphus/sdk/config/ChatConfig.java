@@ -2,18 +2,19 @@ package com.paphus.sdk.config;
 
 import java.io.StringWriter;
 
-
 /**
  * DTO for XML chat config.
  */
-public class ChatConfig extends Config {
-	
-	public String conversation;	
+public class ChatConfig extends Config {	
+	public String conversation;
 	public boolean correction;
 	public boolean offensive;
 	public boolean disconnect;
 	public String emote;
+	public String action;
 	public String message;
+	public boolean speak;
+	public boolean includeQuestion;
 	
 	public String toXML() {
 		StringWriter writer = new StringWriter();
@@ -25,11 +26,20 @@ public class ChatConfig extends Config {
 		if (this.emote != null) {
 			writer.write(" emote=\"" + this.emote + "\"");
 		}
+		if (this.action != null) {
+			writer.write(" action=\"" + this.action + "\"");
+		}
 		if (this.correction) {
 			writer.write(" correction=\"" + this.correction + "\"");
 		}
 		if (this.offensive) {
 			writer.write(" offensive=\"" + this.offensive + "\"");
+		}
+		if (this.speak) {
+			writer.write(" speak=\"" + this.speak + "\"");
+		}
+		if (this.includeQuestion) {
+			writer.write(" includeQuestion=\"" + this.includeQuestion + "\"");
 		}
 		if (this.disconnect) {
 			writer.write(" disconnect=\"" + this.disconnect + "\"");

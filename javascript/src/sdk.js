@@ -33,7 +33,7 @@
  * This is used for chat bots, forums, user admin, and domains.
  * 
  * LiveChatConnection uses web sockets to provide access to live chat and chatrooms.
- * Version: 2.0.3-2014-12-16
+ * Version: 2.1.2-2015-01-27
  */
 
 var SDK = {};
@@ -42,7 +42,8 @@ SDK.DOMAIN = "www.botlibre.com";
 //SDK.DOMAIN = window.location.host;
 SDK.APP = "";
 //SDK.APP = "/botlibre";
-SDK.PATH = "/rest/botlibre";
+SDK.PATH = "/rest/api";
+SDK.MAX_FILE_UPLOAD = 1000000;
 
 SDK.host = SDK.DOMAIN;
 SDK.app = SDK.APP;
@@ -135,6 +136,20 @@ SDK.tts = function(text, voice) {
 }
 
 /**
+ * Detect Chrome browser.
+ */
+SDK.isChrome = function() {
+	return navigator.userAgent.toLowerCase().indexOf('chrome') > -1;
+}
+
+/**
+ * Detect Firefox browser.
+ */
+SDK.isFirefox = function() {
+	return navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+}
+
+/**
  * Insert the text into the input field.
  */
 SDK.insertAtCaret = function(element, text) {
@@ -169,6 +184,50 @@ SDK.innerHTML = function(element) {
 		html = div.innerHTML;
 	}
 	return html;
+}
+
+SDK.linkURLs = function(text) {
+	var http = text.indexOf("http") != -1;
+	var www = text.indexOf("www.") != -1;
+	var email = text.indexOf("@") != -1;
+	if (!http && !www && !email) {
+		return text;
+	}
+	if (text.indexOf("<") != -1 && text.indexOf(">") != -1) {
+		return text;
+	}
+	if (http) {
+	    var regex = /\b(?:https?|ftp|file):\/\/[a-z0-9-+&@#\/%?=~_|!:,.;]*[a-z0-9-+&@#\/%=~_|]/gim;
+	    text = text.replace(regex, function(url, b, c) {
+	    	if (url.indexOf(".png") != -1 || url.indexOf(".jpg") != -1 || url.indexOf(".jpeg") != -1 || url.indexOf(".gif") != -1) {
+	    		return '<a href="' + url + '" target="_blank"><img src="' + url + '" height="50"></a>';
+	    	} else if (url.indexOf(".mp4") != -1 || url.indexOf(".webm") != -1 || url.indexOf(".ogg") != -1) {
+	    		return '<a href="' + url + '" target="_blank"><video src="' + url + '" height="50"></a>';
+	    	} else if (url.indexOf(".wav") != -1 || url.indexOf(".mp3") != -1) {
+	    		return '<a href="' + url + '" target="_blank"><audio src="' + url + '" controls>audio</a>';
+	    	} else {
+	    		return '<a href="' + url + '" target="_blank">' + url + '</a>';
+	    	}
+	    });
+	} else if (www) {
+	    var regex = /((www\.)[^\s]+)/gim;
+	    text = text.replace(regex, function(url, b, c) {
+	        return '<a href="http://' + url + '" target="_blank">' + url + '</a>';
+	    });
+	}
+    
+    // http://, https://, ftp://
+    //var urlPattern = /\b(?:https?|ftp):\/\/[a-z0-9-+&@#\/%?=~_|!:,.;]*[a-z0-9-+&@#\/%=~_|]/gim;
+
+    // www. 
+    // var wwwPattern = /(^|[^\/])(www\.[\S]+(\b|$))/gim;
+
+    // name@domain.com
+	if (email) {
+    	var emailPattern = /(([a-zA-Z0-9_\-\.]+)@[a-zA-Z_]+?(?:\.[a-zA-Z]{2,6}))+/gim;
+    	text = text.replace(emailPattern, '<a target="_blank" href="mailto:$1">$1</a>');
+	}
+	return text;
 }
 
 /**
@@ -379,6 +438,7 @@ function WebLiveChatListener() {
 	this.voice = null;
 	this.user = 'anonymous';
 	this.connection = null;
+	this.sdk = null;
 	
 	/**
 	 * A user message was received from the channel.
@@ -402,7 +462,7 @@ function WebLiveChatListener() {
 				}
 			}
 		}
-		document.getElementById('response').innerHTML = message;
+		document.getElementById('response').innerHTML = SDK.linkURLs(message);
 		var scroller = document.getElementById('scroller');
 		var consolepane = document.getElementById('console');
 		if (scroller == null || consolepane == null) {
@@ -421,7 +481,7 @@ function WebLiveChatListener() {
 		span.className = chatClass;
 		span.innerHTML = speaker;
 		span2.className = chatClass;
-		span2.innerHTML = response;
+		span2.innerHTML = SDK.linkURLs(response);
 		td.setAttribute('nowrap', 'nowrap');
 		td2.className = chatClass;
 		td2.setAttribute('align', 'left');
@@ -506,6 +566,28 @@ function WebLiveChatListener() {
 			this.connection.sendMessage(message);
 			document.getElementById('chat').value = '';
 		}
+		return false;
+	};
+
+	this.sendAttachment = function() {
+		if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
+			alert('The File APIs are not fully supported in this browser.');
+			return false;
+		}
+		var form = document.createElement("form");
+		form.enctype = "multipart/form-data";
+		form.method = "post";
+		form.name = "fileinfo";
+		var fileInput = document.createElement("input");
+		var self = this;
+		fileInput.name = "file";
+		fileInput.type = "file";
+		form.appendChild(fileInput);
+		fileInput.onchange = function() {
+			var file = fileInput.files[0];
+			self.connection.sendAttachment(file, form);
+		}
+		fileInput.click();
 		return false;
 	};
 
@@ -610,6 +692,10 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
 				audio.onended = afterFunction;
 			}
 			return;
+		} else {
+			if (response.avatarBackground != null) {
+				video.poster = urlprefix + response.avatarBackground;				
+			}
 		}
 		var end = function() {
 			video.src = urlprefix + response.avatar;
@@ -629,8 +715,7 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
 						video.loop = true;
 						//var audio = new Audio(urlprefix + response.speech, channelaudio);
 						var audio = SDK.play(urlprefix + response.speech, channelaudio);
-						console.log("updateAvatar");
-						audio.onabort = function() {console.log("abort");}
+						//audio.onabort = function() {console.log("abort");}
 						audio.oncanplay = function() {
 							video.src = urlprefix + response.avatarTalk;
 							video.loop = true;
@@ -640,12 +725,12 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
 							console.log("error");
 							end();
 						}
-						audio.onloadeddata = function() {console.log("loadeddata");}
-						audio.onloadedmetadata = function() {console.log("loadedmetadata");}
-						audio.onpause = function() {console.log("pause");}
-						audio.onplay = function() {console.log("play");}
-						audio.onplaying = function() {console.log("playing");}
-						audio.ontimeupdate = function() {console.log("timeupdate");}
+						//audio.onloadeddata = function() {console.log("loadeddata");}
+						//audio.onloadedmetadata = function() {console.log("loadedmetadata");}
+						//audio.onpause = function() {console.log("pause");}
+						//audio.onplay = function() {console.log("play");}
+						//audio.onplaying = function() {console.log("playing");}
+						//audio.ontimeupdate = function() {console.log("timeupdate");}
 						audio.onended = function() {
 							end();
 						}
@@ -727,6 +812,8 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
  * Or you can call createBox() to have the WebChatbotListener create its own components in the current page.
  */
 function WebChatbotListener() {
+	/** Set the caption for the button bar button. */
+	this.caption = null;
 	/** Enable or disable speech. */
 	this.speak = true;
 	/** A SDK connection must be set, be sure to include your app id. */
@@ -737,8 +824,16 @@ function WebChatbotListener() {
 	this.instanceName = "Bot";
 	/** The name to display for the user. */
 	this.userName = "You";
+	/** Allow the button color to be set. */
+	this.color = "#009900";
 	/** Allow the background color to be set. */
 	this.background = null;
+	/** Avatar image/video width. */
+	this.width = 300;
+	/** Avatar image/video height. */
+	this.height = null;
+	/** Only apply the background color if not Chrome. */
+	this.backgroundIfNotChrome = false;
 	
 	this.switchText = true;
 	this.big = false;
@@ -748,13 +843,41 @@ function WebChatbotListener() {
 	 * Create an embedding bar and div in the current webpage.
 	 */
 	this.createBox = function() {
+		if (this.caption == null) {
+			this.caption = this.instanceName;
+		}
 		var backgroundstyle = "";
+		var buttonstyle = "";
 		var hidden = "hidden";
 		var border = "";
-		if (this.background != null) {
+		if ((this.background != null) && (!this.backgroundIfNotChrome || !SDK.isChrome())) {
 			backgroundstyle = " style='background-color:" + this.background + "'";
 			hidden = "visible";
 			border = "border:1px;border-style:solid;border-color:black;";
+		}
+		if (this.color != null) {
+			buttonstyle = "background-color:" + this.color + ";";
+		}
+		var minWidth = "";
+		var divWidth = "";
+		var background = "";
+		var minHeight = "";
+		var divHeight = "";
+		if (this.width != null) {
+			minWidth = "width:" + this.width + "px;";
+			background = "background-size:" + this.width + "px auto;";
+			divWidth = minWidth;
+			divHeight = "min-height:" + this.width + "px;";
+		}
+		if (this.height != null) {
+			minHeight = "height:" + this.height + "px;";
+			divHeight = minHeight;
+			if (this.width != null) {
+				background = "background-size:" + this.width + "px " + this.height + "px;";
+			} else {
+				background = "background-size: auto " + this.height + "px;";
+				divWidth = "min-width:" + this.height + "px;";
+			}
 		}
 		var box = document.createElement('div');
 		var html =
@@ -766,31 +889,31 @@ function WebChatbotListener() {
 				+ "#boxclose, #boxmin, #boxmax { font-size:20px;margin:2px;padding:0px;text-decoration:none; }\n"
 				+ "#boxbarmax { font-size:18px;margin:2px;padding:0px;text-decoration:none; }\n"
 				+ "#boxclose:hover, #boxmin:hover, #boxmax:hover { color: #fff;background: grey; }\n"
-				+ ".boxbar { position:fixed;bottom:2px;right:30px;z-index:52;margin:0;padding:6px;background-color:#009900; }\n"
+				+ ".boxbar { position:fixed;bottom:2px;right:30px;z-index:52;margin:0;padding:6px;" + buttonstyle + " }\n"
 			+ "</style>\n"
 			+ "<div id='box' class='box' " + backgroundstyle + ">"
 				+ "<div class='boxmenu'>"
 				+ "<span style='float:right'><a id='boxmin' href='#'>&#95;</a><a id='boxmax' href='#'>&square;</a><a id='boxclose' href='#'>&times;</a></span><br/>"
 				+ "</div>"
 
-				+ "<div id='avatar-image-div' style='min-height:200px;min-width:200px;'>"
-					+ "<img id='avatar' style='max-height:400px;width:200px'/>"
+				+ "<div id='avatar-image-div' style='display:none;" + minHeight + minWidth + "'>"
+					+ "<img id='avatar' style='" + minHeight + minWidth + "'/>"
 					+ "</div>"
-					+ "<div id='avatar-video-div' style='display:none;min-height:200px;min-width:200px;background-size:200px 200px;background-repeat: no-repeat;'>"
-					+ "<video id='avatar-video' autoplay preload='auto' style='background:transparent;max-height:400px;width:200px'>"
+					+ "<div id='avatar-video-div' style='display:none;" + divHeight + divWidth + background + "background-repeat: no-repeat;'>"
+					+ "<video id='avatar-video' autoplay preload='auto' style='background:transparent;" + minHeight + minWidth + "'>"
 					+ "Video format not supported by your browser (try Chrome)"
 					+ "</video>"
 				+ "</div>"
 				
 				+ "<div>"
-					+ "<div style='max-width:200px;max-height:100px;overflow:auto;'>"
+					+ "<div style='"+ minWidth + ";max-height:100px;overflow:auto;margin:10px;'>"
 						+ "<span id='response'></span><br/>"
 					+ "</div>"
-					+ "<input id='chat' style='width:192px;margin:2px;padding:0px;' type='text'/>"
+					+ "<span style='display:block;overflow:hidden;margin:2px;padding-right:4px'><input id='chat' type='text' style='width:100%'/></span>"
 				+ "</div>"
 			+ "</div>"
 			+ "<div id='boxbar' class='boxbar'>"
-			+ "<span><a id='boxbarmax' href='#' style='color:white'>" + this.instanceName + "</a></span>"
+			+ "<span><a id='boxbarmax' href='#' style='color:white'>" + this.caption + "</a></span>"
 			+ "</div>";
 		
 		box.innerHTML = html;
@@ -824,11 +947,18 @@ function WebChatbotListener() {
 	/**
 	 * Create a live chat bar beside the bot bar.
 	 */
-	this.createLiveChatBox = function(channel, label) {
+	this.createLiveChatBox = function(channel, label, position) {
 		var box = document.createElement('div');
+		if (this.color != null) {
+			buttonstyle = "background-color:" + this.color + ";";
+		}
+		if (position == null) {
+			position = (this.caption.length + label.length) * 8;
+			position = "right:" + position + "px";
+		}
 		var html =
 			"<style>\n"
-				+ ".livechatboxbar { position:fixed;bottom:2px;right:130px;z-index:52;margin:0;padding:6px;background-color:#009900; }\n"
+				+ ".livechatboxbar { position:fixed;bottom:2px;" + position + ";z-index:52;margin:0;padding:6px;" + buttonstyle + " }\n"
 				+ "#livechatboxmax { font-size:18px;margin:2px;padding:0px;text-decoration:none; }\n"
 			+ "</style>\n"
 			+ "<div id='livechatboxbar' class='livechatboxbar'>"
@@ -839,7 +969,7 @@ function WebChatbotListener() {
 		document.body.appendChild(box);
 		
 		document.getElementById("livechatboxmax").addEventListener("click", function() {
-			SDK.popupwindow('livechat?id=' + channel + '&embedded&chat','child', 700, 520);
+			SDK.popupwindow(SDK.url + '/livechat?id=' + channel + '&embedded&chat','child', 700, 520);
 			return false;
 		});
 	}
@@ -894,7 +1024,7 @@ function WebChatbotListener() {
 		if (box != null) {
 			box.style.display = 'none';
 		}
-		SDK.popupwindow('chat?id=' + this.instance + '&embedded','child', 600, 420);
+		SDK.popupwindow(SDK.url + '/chat?id=' + this.instance + '&embedded' + '&application=' + this.connection.credentials.applicationId ,'child', 600, 420);
 		this.exit();
 		return false;
 	}
@@ -903,7 +1033,7 @@ function WebChatbotListener() {
 	 * A chat message was received from the bot.
 	 */
 	this.response = function(user, message) {
-		document.getElementById('response').innerHTML = message;
+		document.getElementById('response').innerHTML = SDK.linkURLs(message);
 		this.message(user, message);
 		document.getElementById('chat').focus();
 	}
@@ -914,8 +1044,8 @@ function WebChatbotListener() {
 	this.message = function(user, message) {
 		var speaker = user;
 		var scroller = document.getElementById('scroller');
-		var console = document.getElementById('console');
-		if (scroller == null || console == null) {
+		var chatconsole = document.getElementById('console');
+		if (scroller == null || chatconsole == null) {
 			return;
 		}
 		var tr = document.createElement('tr');
@@ -931,19 +1061,19 @@ function WebChatbotListener() {
 		span.className = chatClass;
 		span.innerHTML = speaker;
 		span2.className = chatClass;
-		span2.innerHTML = message;
+		span2.innerHTML = SDK.linkURLs(message);
 		td.setAttribute('nowrap', 'nowrap');
 		td2.className = chatClass;
 		td2.setAttribute('align', 'left');
 		td2.setAttribute('width', '100%');
-		console.appendChild(tr);
+		chatconsole.appendChild(tr);
 		tr.appendChild(td);
 		td.appendChild(span);
 		tr.appendChild(td2);
 		td2.appendChild(span2);
 		this.switchText = !this.switchText;
-		while (console.childNodes.length > 25) {
-			console.removeChild(console.firstChild);
+		while (chatconsole.childNodes.length > 50) {
+			chatconsole.removeChild(chatconsole.firstChild);
 		}
 		scroller.scrollTop = scroller.scrollHeight;
 	};
@@ -1076,27 +1206,29 @@ function WebChatbotListener() {
 			avatar.style.width = "auto";
 			avatar.style.maxWidth = "800px";
 			avatar.style.height = "400px";
-			avatarVideo.style.maxHeight = "400px";
-			avatarVideo.style.width = "400px";
+			avatarVideo.style.maxWidth = "800px";
+			avatarVideo.style.width = "auto";
+			avatarVideo.style.height = "400px";
 			scroller.style.display = "none";
 			avatarVideoDiv.style.minHeight = "400px";
 			avatarVideoDiv.style.minWidth = "400px";
 			avatarDiv.style.minHeight = "400px";
 			avatarDiv.style.minWidth = "400px";
-			avatarVideoDiv.style.backgroundSize = "400px 400px";
+			avatarVideoDiv.style.backgroundSize = "auto 400px";
 			this.big = true;
 		} else {
 			avatar.style.width = "200px";
-			avatar.style.maxWidth = "200px";
+			avatar.style.maxHeight = "400px";
 			avatar.style.height = "auto";
-			avatarVideo.style.maxHeight = "200px";
+			avatarVideo.style.maxHeight = "400px";
 			avatarVideo.style.width = "200px";
+			avatarVideo.style.height = "auto";
 			scroller.style.display = "inline-block";
 			avatarVideoDiv.style.minHeight = "200px";
 			avatarVideoDiv.style.minWidth = "200px";
 			avatarDiv.style.minHeight = "200px";
 			avatarDiv.style.minWidth = "200px";
-			avatarVideoDiv.style.backgroundSize = "200px 200px";
+			avatarVideoDiv.style.backgroundSize = "200px auto";
 			this.big = false;
 		}
 		return false;
@@ -1124,6 +1256,12 @@ function WebAvatar() {
 	this.voice = null;
 	/** Allow the background color to be set. */
 	this.background = null;
+	/** Avatar image/video width. */
+	this.width = 300;
+	/** Avatar image/video height. */
+	this.height = null;
+	/** Only apply the background color if not Chrome. */
+	this.backgroundIfNotChrome = false;
 	/** An optional close event. */
 	this.onclose = null;
 	/** Return if the avatar box is in a closed state. */
@@ -1142,12 +1280,33 @@ function WebAvatar() {
 		var backgroundstyle = "";
 		var hidden = "hidden";
 		var border = "";
-		if (this.background != null) {
+		if ((this.background != null) && (!this.backgroundIfNotChrome || !SDK.isChrome())) {
 			backgroundstyle = " style='background-color:" + this.background + "'";
 			hidden = "visible";
 			border = "border:1px;border-style:solid;border-color:black;";
 		}
 		var box = document.createElement('div');
+		var minWidth = "";
+		var minHeight = "";
+		var divWidth = "";
+		var divHeight = "";
+		var background = "";
+		if (this.width != null) {
+			minWidth = "width:" + this.width + "px;";
+			background = "background-size:" + this.width + "px;";
+			divWidth = minWidth;
+			divHeight = "min-height:" + this.width + "px;";
+		}
+		if (this.height != null) {
+			minHeight = "height:" + this.height + "px;";
+			divHeight = minHeight;
+			if (this.width != null) {
+				background = "background-size:" + this.width + "px " + this.height + "px;";
+			} else {
+				background = "background-size: auto " + this.height + "px;";
+				divWidth = "min-width:" + this.height + "px;";
+			}
+		}
 		var html =
 			"<style>\n"
 				+ ".avatarbox { position:fixed;bottom:10px;left:10px;z-index:52;margin:2px;" + border + " }\n"
@@ -1162,11 +1321,11 @@ function WebAvatar() {
 				+ "<span style='float:right'><a id='avatarboxclose' href='#'>&times;</a></span><br/>"
 				+ "</div>"
 
-				+ "<div id='" + this.elementPrefix + "avatar-image-div' style='min-height:200px;min-width:200px;'>"
-					+ "<img id='" + this.elementPrefix + "avatar' style='max-height:400px;width:200px'/>"
+				+ "<div id='" + this.elementPrefix + "avatar-image-div' style='display:none;" + minWidth + minHeight + "'>"
+					+ "<img id='" + this.elementPrefix + "avatar' style='" + minWidth + minHeight + "'/>"
 					+ "</div>"
-					+ "<div id='" + this.elementPrefix + "avatar-video-div' style='display:none;min-height:200px;min-width:200px;background-size:200px 200px;background-repeat: no-repeat;'>"
-					+ "<video id='" + this.elementPrefix + "avatar-video' autoplay preload='auto' style='background:transparent;max-height:400px;width:200px'>"
+					+ "<div id='" + this.elementPrefix + "avatar-video-div' style='display:none;" + divWidth + divHeight + background + "background-repeat: no-repeat;'>"
+					+ "<video id='" + this.elementPrefix + "avatar-video' autoplay preload='auto' style='background:transparent;" + minWidth + minHeight + "'>"
 					+ "Video format not supported by your browser (try Chrome)"
 					+ "</video>"
 				+ "</div>"
@@ -1387,6 +1546,30 @@ function LiveChatConnection() {
 		this.socket.send(message);
 	};
 
+	this.sendAttachment = function(file, form) {
+		var self = this;
+		var media = new MediaConfig();
+		if (this.channel == null) {
+			this.listener.error("Missing channel property");
+			return false;
+		}
+		media.instance = this.channel.id;
+		media.name = file.name;
+		media.type = file.type;
+		if (file.size > SDK.MAX_FILE_UPLOAD) {
+			this.listener.error("File exceeds maximum upload size of " + SDK.MAX_FILE_UPLOAD);
+		} else {
+			this.sdk.error = function(message) {
+				self.listener.error(message);
+			}
+			this.sdk.createChannelAttachment(media, form, function(media) {
+				var message = "file: " + file.name + " : " + file.type + " : " + self.sdk.fetchImage(media.file);
+				self.sendMessage(message);
+			})
+		}
+		return false;
+	};
+
 	/**
 	 * Accept a private request.
 	 * This is also used by an operator to accept the top of the waiting queue.
@@ -1523,6 +1706,7 @@ function SDKConnection() {
 	 */
 	this.openLiveChat = function(channel, listener) {
 		var connection = new LiveChatConnection();
+		connection.sdk = this;
 		connection.credentials = this.credentials;
 		connection.listener = listener;
 		connection.connect(channel, this.user);
@@ -1602,6 +1786,21 @@ function SDKConnection() {
 			user.parseXML(xml);
 			this.user = user;
 			processor(user);
+		});
+	}
+
+	/**
+	 * Create a new file/image/media attachment for a chat channel.
+	 */
+	this.createChannelAttachment = function(config, form, processor) {
+		config.addCredentials(this);
+		this.POST_FILE(this.credentials.rest + "/create-channel-attachment", form, config.toXML(), function(xml) {
+			if (xml == null) {
+				return null;
+			}
+			var media = new MediaConfig();
+			media.parseXML(xml);
+			processor(media);
 		});
 	}
 	
@@ -1957,6 +2156,45 @@ function SDKConnection() {
 		request.open('POST', url, true);
 		request.setRequestHeader("Content-Type", "application/xml");
 		request.send(xml);
+	}
+	
+	this.POST_FILE = function(url, form, xml, processor) {
+		if (this.debug) {
+			console.log("POST FILE: " + url);
+			console.log("FORM: " + form);
+			console.log("XML: " + xml);
+		}
+		var request = new XMLHttpRequest();
+		var formData = new FormData(form);
+		formData.append("xml", xml);
+		console.log(formData);
+		var debug = this.debug;
+		var self = this;
+		request.onreadystatechange = function() {
+			if (debug) {
+				console.log(request.readyState);
+				console.log(request.status);
+				console.log(request.statusText);
+				console.log(request.responseText);
+				console.log(request.responseXML);
+			}
+			if (request.readyState != 4) return;
+			if (request.status != 200 && request.status != 204) {
+				console.log('Error: SDK POST web request failed');
+				if (debug) {
+					console.log(request.statusText);
+					console.log(request.responseText);
+					console.log(request.responseXML);
+				}
+				self.error(request.responseText);
+				return;
+			}
+			processor(request.responseXML.childNodes[0]);
+		};
+		
+		request.open('POST', url, true);
+		//request.setRequestHeader("Content-Type", "multipart/form-data");
+		request.send(formData);
 	}
 }
 
@@ -2746,9 +2984,51 @@ InstanceConfig.prototype = new WebMediumConfig();
 InstanceConfig.constructor = InstanceConfig;
 
 /**
+ * DTO for XML media config.
+ */
+function MediaConfig() {
+	this.id;	
+	this.name;
+	this.type;
+	this.file;
+	this.key;
+	
+	this.parseXML = function (element) {		
+		this.id = element.getAttribute("id");
+		this.name = element.getAttribute("name");
+		this.type = element.getAttribute("type");
+		this.file = element.getAttribute("file");
+		this.key = element.getAttribute("key");
+	}
+	
+	this.toXML = function() {
+		var xml = "<media";
+		xml = this.writeCredentials(xml);
+
+		if (this.id != null) {
+			xml = xml + (" id=\"" + this.id + "\"");
+		}
+		if (this.name != null) {
+			xml = xml + (" name=\"" + this.name + "\"");
+		}
+		if (this.file != null) {
+			xml = xml + (" file=\"" + this.file + "\"");
+		}
+		if (this.key != null) {
+			xml = xml + (" key=\"" + this.key + "\"");
+		}
+		
+		xml = xml + ("/>");
+		return xml;
+	}
+}
+MediaConfig.prototype = new Config();
+MediaConfig.constructor = MediaConfig;
+
+/**
  * DTO for XML voice config.
  */
-function VoiceConfig() {	
+function VoiceConfig() {
 	this.language;	
 	this.pitch;
 	this.speechRate;
