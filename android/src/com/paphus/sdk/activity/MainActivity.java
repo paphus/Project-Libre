@@ -3,8 +3,6 @@ package com.paphus.sdk.activity;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -68,10 +66,6 @@ public class MainActivity extends Activity {
 	public static final boolean DEBUG = false;
 	public static final boolean ADULT = false;
 	
-	public static Pattern httpRegex = Pattern.compile("\\b(?:https?|ftp|file):\\/\\/[a-z0-9-+&@#\\/%?=~_|!:,.;]*[a-z0-9-+&@#\\/%=~_|]", Pattern.CASE_INSENSITIVE);
-	public static Pattern wwwRegex = Pattern.compile("((www\\.)[^\\s]+)", Pattern.CASE_INSENSITIVE);
-	public static Pattern emailRegex = Pattern.compile("(([a-zA-Z0-9_\\-\\.]+)@[a-zA-Z_]+?(?:\\.[a-zA-Z]{2,6}))+", Pattern.CASE_INSENSITIVE);
-	
 	/**
 	 * Enter your application ID here.
 	 * You can get an application ID from any of the services websites (BOT libre, FORUMS libre, LIVE CHAT libre, Paphus Live Chat)
@@ -114,6 +108,10 @@ public class MainActivity extends Activity {
 	 */
 	public static LaunchType launchType = LaunchType.Browse;
 	public enum LaunchType {Browse, Bot, Forum, Channel}
+
+	public static boolean sound = true;
+	public static boolean disableVideo;
+	public static boolean deviceVoice;
 	
 	public static WebMediumConfig instance;
 	public static ForumPostConfig post;
@@ -183,61 +181,6 @@ public class MainActivity extends Activity {
 		int index = path.lastIndexOf(".");
 		String ext = path.substring(index + 1, path.length());
 		return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
-	}
-	
-	public static String linkHTML(String text) {
-		if (text == null || text.length() == 0) {
-			return "";
-		}
-		boolean http = text.indexOf("http") != -1;
-		boolean www = text.indexOf("www.") != -1;
-		boolean email = text.indexOf("@") != -1;
-		if (!http && !www && !email) {
-			return text;
-		}
-		if (text.indexOf("<") != -1 && text.indexOf(">") != -1) {
-			return text;
-		}
-		if (http) {
-			Matcher matcher = httpRegex.matcher(text);
-			StringBuffer sb = new StringBuffer();
-			while (matcher.find()) {
-				String url = matcher.group();
-		    	if (url.indexOf(".png") != -1 || url.indexOf(".jpg") != -1 || url.indexOf(".jpeg") != -1 || url.indexOf(".gif") != -1) {
-		    		url = "<a href='" + url + "' target='_blank'><img src='" + url + "' height='50'></a>";
-		    	} else if (url.indexOf(".mp4") != -1 || url.indexOf(".webm") != -1 || url.indexOf(".ogg") != -1) {
-		    		url = "<a href='" + url + "' target='_blank'><video src='" + url + "' height='50'></a>";
-		    	} else if (url.indexOf(".wav") != -1 || url.indexOf(".mp3") != -1) {
-		    		url = "<a href='" + url + "' target='_blank'><audio src='" + url + "' controls>audio</a>";
-		    	} else {
-		    		url = "<a href='" + url + "' target='_blank'>" + url + "</a>";
-		    	}
-				matcher.appendReplacement(sb, url);
-			}
-			matcher.appendTail(sb);
-			text = sb.toString();
-		} else if (www) {
-			Matcher matcher = wwwRegex.matcher(text);
-			StringBuffer sb = new StringBuffer();
-			while (matcher.find()) {
-				String url = matcher.group();
-				matcher.appendReplacement(sb, "<a href='http://" + url + "' target='_blank'>" + url + "</a>");
-			}
-			matcher.appendTail(sb);
-			text = sb.toString();
-		}
-		
-		if (email) {
-			Matcher matcher = emailRegex.matcher(text);
-			StringBuffer sb = new StringBuffer();
-			while (matcher.find()) {
-				String address = matcher.group();
-				matcher.appendReplacement(sb, "<a href='mailto://" + address + "' target='_blank'>" + address + "</a>");
-			}
-			matcher.appendTail(sb);
-			text = sb.toString();
-		}
-		return text;
 	}
 	
 	public static void error(String message, Exception exception, Activity activity) {
@@ -341,15 +284,14 @@ public class MainActivity extends Activity {
 	        HttpGetImageAction.fetchImage(this, domain.avatar, (ImageView)findViewById(R.id.splash));			
 		}
         if (MainActivity.user == null) {
-        	findViewById(R.id.logoutButton).setEnabled(false);
-        	findViewById(R.id.logoutButton).setBackgroundResource(R.drawable.logout2);
-        	findViewById(R.id.loginButton).setEnabled(true);
-        	findViewById(R.id.loginButton).setBackgroundResource(R.drawable.login);
+        	findViewById(R.id.vewUserButton).setVisibility(View.GONE);
+        	findViewById(R.id.logoutButton).setVisibility(View.GONE);
+        	findViewById(R.id.loginButton).setVisibility(View.VISIBLE);
         } else {
-        	findViewById(R.id.logoutButton).setEnabled(true);
-        	findViewById(R.id.logoutButton).setBackgroundResource(R.drawable.logout);
-        	findViewById(R.id.loginButton).setEnabled(false);
-        	findViewById(R.id.loginButton).setBackgroundResource(R.drawable.login2);
+        	findViewById(R.id.logoutButton).setVisibility(View.VISIBLE);
+        	findViewById(R.id.loginButton).setVisibility(View.GONE);
+        	findViewById(R.id.vewUserButton).setVisibility(View.VISIBLE);
+	        HttpGetImageAction.fetchImage(this, MainActivity.user.avatar, findViewById(R.id.vewUserButton));
         }
 		resetMenu();
 	}
@@ -467,6 +409,8 @@ public class MainActivity extends Activity {
     	editor.putString("instance", null);
     	editor.commit();
     	
+    	HttpGetImageAction.clearFileCache(this);
+    	
         Intent intent = getIntent();
         finish();
         startActivity(intent);
@@ -496,6 +440,10 @@ public class MainActivity extends Activity {
         startActivity(intent);
 	}
 
+	public void viewUser(View view) {
+		viewUser();
+	}
+	
 	public void viewUser() {
 		viewUser = user;
 		Spinner spin = (Spinner) findViewById(R.id.typeSpin);

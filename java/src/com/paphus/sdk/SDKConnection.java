@@ -61,6 +61,8 @@ import com.paphus.sdk.config.ForumConfig;
 import com.paphus.sdk.config.ForumPostConfig;
 import com.paphus.sdk.config.InstanceConfig;
 import com.paphus.sdk.config.MediaConfig;
+import com.paphus.sdk.config.TrainingConfig;
+import com.paphus.sdk.config.UserAdminConfig;
 import com.paphus.sdk.config.UserConfig;
 import com.paphus.sdk.config.VoiceConfig;
 import com.paphus.sdk.config.WebMediumConfig;
@@ -95,6 +97,13 @@ public class SDKConnection {
 	
 	protected SDKException exception;
 
+	/**
+	 * Return the name of the default user image.
+	 */
+	public static String defaultUserImage() {
+		return "images/user-thumb.jpg";
+	}
+	
 	/**
 	 * Create an SDK connection with the credentials.
 	 * Use the Credentials subclass specific to your server.
@@ -502,6 +511,22 @@ public class SDKConnection {
 			users.add(user.user);
 		}
 		return users;
+	}
+	
+	/**
+	 * Train the bot with a new question/response pair.
+	 */
+	public void train(TrainingConfig config) {
+		config.addCredentials(this);
+		POST(this.url + "/train-instance", config.toXML());
+	}
+	
+	/**
+	 * Perform the user administration task (add or remove users, or administrators).
+	 */
+	public void userAdmin(UserAdminConfig config) {
+		config.addCredentials(this);
+		POST(this.url + "/user-admin", config.toXML());
 	}
 	
 	/**

@@ -63,7 +63,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="tags"
-                android:textAppearance="?android:attr/textAppearanceSmall" />
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/websiteLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="website"
+                android:autoLink="web"
+                android:textSize="10sp" />
 
             <TextView
                 android:id="@+id/licenseLabel"
@@ -99,7 +107,6 @@
     </LinearLayout>
 
     <ScrollView
-        android:id="@+id/scrollView"
         android:layout_width="match_parent"
         android:layout_height="0px"
         android:layout_weight="1"
@@ -108,24 +115,24 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="vertical" >
 
-            <TextView
+            <WebView
                 android:id="@+id/descriptionLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="description"
                 android:textAppearance="?android:attr/textAppearanceSmall" />
 
-            <TextView
+            <WebView
                 android:id="@+id/detailsLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="details"
                 android:textSize="10sp" />
 
-            <TextView
+            <WebView
                 android:id="@+id/disclaimerLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

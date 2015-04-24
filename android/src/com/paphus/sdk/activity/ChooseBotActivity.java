@@ -4,6 +4,8 @@ import java.util.List;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ListView;
 
@@ -30,6 +32,29 @@ public class ChooseBotActivity extends Activity {
 
 		ListView list = (ListView) findViewById(R.id.instancesList);
 		list.setAdapter(new ImageListAdapter(this, R.layout.image_list, this.instances));
+		GestureDetector.SimpleOnGestureListener listener = new GestureDetector.SimpleOnGestureListener() {
+			@Override
+			public boolean onDoubleTapEvent(MotionEvent event) {
+				if (event.getAction() == MotionEvent.ACTION_UP) {
+					ListView list = (ListView) findViewById(R.id.instancesList);
+			        int index = list.getCheckedItemPosition();
+			        if (index < 0) {
+						return false;
+			        } else {
+			        	selectInstance(list);
+			        }
+					return true;
+				}
+				return false;
+			}
+		};
+		final GestureDetector listDetector = new GestureDetector(this, listener);
+		list.setOnTouchListener(new View.OnTouchListener() {			
+			@Override
+			public boolean onTouch(View v, MotionEvent event) {
+				return listDetector.onTouchEvent(event);
+			}
+		});
 	}
 	
 	@Override
@@ -55,6 +80,22 @@ public class ChooseBotActivity extends Activity {
         config.name = this.instance.name;
 		
         HttpAction action = new HttpFetchAction(this, config);
+    	action.execute();
+	}
+
+	public void chat(View view) {
+        ListView list = (ListView) findViewById(R.id.instancesList);
+        int index = list.getCheckedItemPosition();
+        if (index < 0) {
+        	MainActivity.showMessage("Select a bot", this);
+        	return;
+        }
+        this.instance = instances.get(index);
+        InstanceConfig config = new InstanceConfig();
+        config.id = this.instance.id;
+        config.name = this.instance.name;
+		
+        HttpAction action = new HttpFetchAction(this, config, true);
     	action.execute();
 	}
 }

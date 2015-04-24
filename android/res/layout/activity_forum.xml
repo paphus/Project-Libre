@@ -22,8 +22,15 @@
             android:adjustViewBounds="true"
             android:src="@drawable/bot" />
 
+	    <ScrollView
+	        android:layout_width="0px"
+	        android:layout_height="match_parent"
+	        android:layout_weight="1"
+	        android:fillViewport="true"
+	        android:scrollbars="vertical" >
+	        
         <LinearLayout
-            android:layout_width="0px"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginRight="5dip"
             android:layout_weight="1"
@@ -49,8 +56,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="tags"
-                android:textAppearance="?android:attr/textAppearanceSmall" />
+                android:textSize="10sp" />
 
+            <TextView
+                android:id="@+id/websiteLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="website"
+                android:autoLink="web"
+                android:textSize="10sp" />
+                        
             <TextView
                 android:id="@+id/licenseLabel"
                 android:layout_width="wrap_content"
@@ -72,6 +87,9 @@
                 android:text="posts"
                 android:textSize="10sp" />
         </LinearLayout>
+        
+        </ScrollView>
+        
     </LinearLayout>
 
     <ScrollView
@@ -87,21 +105,21 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" >
 
-            <TextView
+            <WebView
                 android:id="@+id/descriptionLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="description"
                 android:textAppearance="?android:attr/textAppearanceSmall" />
 
-            <TextView
+            <WebView
                 android:id="@+id/detailsLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="details"
                 android:textSize="10sp" />
 
-            <TextView
+            <WebView
                 android:id="@+id/disclaimerLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

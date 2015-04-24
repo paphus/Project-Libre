@@ -22,6 +22,10 @@ public class ChannelActivity extends WebMediumActivity {
 
         super.resetView();
 
+        if (instance.isExternal) {
+        	findViewById(R.id.chatButton).setVisibility(View.GONE);
+        }
+
     	TextView text = (TextView) findViewById(R.id.messagesLabel);
         if (instance.messages != null && instance.messages.length() > 0) {
 	        text.setText(instance.messages + " messages");

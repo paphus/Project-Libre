@@ -33,9 +33,13 @@
  * This is used for chat bots, forums, user admin, and domains.
  * 
  * LiveChatConnection uses web sockets to provide access to live chat and chatrooms.
- * Version: 2.1.2-2015-01-27
+ * Version: 2.5.1-2015-04-15
  */
 
+/**
+ * Static class for common util functions and static properties.
+ * @class
+ */
 var SDK = {};
 
 SDK.DOMAIN = "www.botlibre.com";
@@ -43,16 +47,27 @@ SDK.DOMAIN = "www.botlibre.com";
 SDK.APP = "";
 //SDK.APP = "/botlibre";
 SDK.PATH = "/rest/api";
-SDK.MAX_FILE_UPLOAD = 1000000;
+SDK.MAX_FILE_UPLOAD = 2000000;
 
 SDK.host = SDK.DOMAIN;
 SDK.app = SDK.APP;
-SDK.url = "http://" + SDK.DOMAIN + SDK.APP;
+SDK.scheme = 'https:' == document.location.protocol ? "https" : "http";
+SDK.url = SDK.scheme + "://" + SDK.DOMAIN + SDK.APP;
 SDK.rest = SDK.url + SDK.PATH;
 
+/**
+ * You must set your application ID to use the SDK.
+ * You can obtain your application ID from your user page.
+ * @static
+ */
 SDK.applicationId = null;
 
+/** @static */
 SDK.debug = false;
+
+/**
+ * Set the error static field to trap or log any errors.
+ */
 SDK.error = function(message) {
 	console.log(message);
 }
@@ -90,10 +105,10 @@ SDK.play = function(file, channelaudio) {
 	return audio;
 }
 
+SDK.playChime = true;
 /**
  * Play the chime sound.
  */
-SDK.playChime = true;
 SDK.chime = function() {
 	if (SDK.playChime) {
 		this.play(SDK.url + '/chime.wav');
@@ -199,6 +214,7 @@ SDK.linkURLs = function(text) {
 	if (http) {
 	    var regex = /\b(?:https?|ftp|file):\/\/[a-z0-9-+&@#\/%?=~_|!:,.;]*[a-z0-9-+&@#\/%=~_|]/gim;
 	    text = text.replace(regex, function(url, b, c) {
+	    	url = url.toLowerCase();
 	    	if (url.indexOf(".png") != -1 || url.indexOf(".jpg") != -1 || url.indexOf(".jpeg") != -1 || url.indexOf(".gif") != -1) {
 	    		return '<a href="' + url + '" target="_blank"><img src="' + url + '" height="50"></a>';
 	    	} else if (url.indexOf(".mp4") != -1 || url.indexOf(".webm") != -1 || url.indexOf(".ogg") != -1) {
@@ -297,11 +313,36 @@ SDK.popupwindow = function(url, title, w, h) {
 	return false;
 }
 
+SDK.dataURLToBlob = function(dataURL) {
+    var marker = ';base64,';
+    if (dataURL.indexOf(marker) == -1) {
+        var parts = dataURL.split(',');
+        var contentType = parts[0].split(':')[1];
+        var raw = parts[1];
+
+        return new Blob([raw], {type: contentType});
+    }
+
+    var parts = dataURL.split(marker);
+    var contentType = parts[0].split(':')[1];
+    var raw = window.atob(parts[1]);
+    var rawLength = raw.length;
+
+    var blobarray = new Uint8Array(rawLength);
+
+    for (var i = 0; i < rawLength; ++i) {
+    	blobarray[i] = raw.charCodeAt(i);
+    }
+
+    return new Blob([blobarray], {type: contentType});
+}
+
 /**
  * Credential used to establish a connection.
  * Defines the url, host, app, rest, which are all defaulted and should not need to be changed,
  * Requires an application id.
  * You can obtain your application id from your user details page on the hosting website.
+ * @class
  */
 function Credentials() {
 	this.host = SDK.host;
@@ -314,6 +355,7 @@ function Credentials() {
 /**
  * Credentials for use with hosted services on the BOT libre website, a free bot hosting service.
  * http://www.botlibre.com
+ * @class
  */
 function BOTlibreCredentials()  {
 	this.DOMAIN = "www.botlibre.com";
@@ -333,6 +375,7 @@ function BOTlibreCredentials()  {
  * Credentials for use with hosted services on the Paphus Live Chat website,
  * a commercial live chat, chatroom, forum, and chat bot, hosting service.
  * http://www.paphuslivechat.com
+ * @class
  */
 function PaphusCredentials()  {
 	this.DOMAIN = "www.paphuslivechat.com";
@@ -349,6 +392,7 @@ function PaphusCredentials()  {
 /**
  * Credentials for use with hosted services on the LIVE CHAT libre website, a free live chat, chatrooms, forum, and chat bots that learn.
  * http://www.livechatlibre.com
+ * @class
  */
 function LIVECHATlibreCredentials()  {
 	this.DOMAIN = "www.livechatlibre.com";
@@ -365,6 +409,7 @@ function LIVECHATlibreCredentials()  {
 /**
  * Credentials for use with hosted services on the FORUMS libre website, a free embeddable forum hosting service.
  * http://www.forumslibre.com
+ * @class
  */
 function FORUMSlibreCredentials()  {
 	this.DOMAIN = "www.forumslibre.com";
@@ -381,6 +426,7 @@ function FORUMSlibreCredentials()  {
 /**
  * Listener interface for a LiveChatConnection.
  * This gives asynchronous notification when a channel receives a message, or notice.
+ * @class
  */
 function LiveChatListener() {
 	/**
@@ -430,15 +476,18 @@ function LiveChatListener() {
  * - console - <table> table for chat log, and user log
  * - scroller - <div> div for chat log scroll pane
  * - online - <table> table for chat user list
+ * @class
  */
 function WebLiveChatListener() {
 	this.switchText = true;
 	this.playChime = true;
 	this.speak = false;
 	this.voice = null;
-	this.user = 'anonymous';
+	this.nick = "";
 	this.connection = null;
 	this.sdk = null;
+	/** Configure if chat should be given focus after message. */
+	this.focus = true;
 	
 	/**
 	 * A user message was received from the channel.
@@ -448,18 +497,16 @@ function WebLiveChatListener() {
 		var speaker = '';
 		if (index != -1) {
 			speaker = message.substring(0, index + 1);
-			response = message.substring(index + 1, message.length);
+			responseText = message.substring(index + 2, message.length);
 		} else {
-			response = message;
+			responseText = message;
 		}
-		if (speaker != (this.user + ':')) {
-			if (this.user != "anonymous" || speaker.length < "anonymous".length || speaker.substring(0, "anonymous".length) != "anonymous") {
-				if (this.playChime) {
-					SDK.chime();
-				}
-				if (this.speak) {
-					SDK.tts(response, this.voice);
-				}
+		if (speaker != (this.nick + ':')) {
+			if (this.playChime) {
+				SDK.chime();
+			}
+			if (this.speak) {
+				SDK.tts(responseText, this.voice);
 			}
 		}
 		document.getElementById('response').innerHTML = SDK.linkURLs(message);
@@ -481,7 +528,8 @@ function WebLiveChatListener() {
 		span.className = chatClass;
 		span.innerHTML = speaker;
 		span2.className = chatClass;
-		span2.innerHTML = SDK.linkURLs(response);
+		span2.innerHTML = SDK.linkURLs(responseText);
+		td.className = 'chat-user';
 		td.setAttribute('nowrap', 'nowrap');
 		td2.className = chatClass;
 		td2.setAttribute('align', 'left');
@@ -492,11 +540,13 @@ function WebLiveChatListener() {
 		tr.appendChild(td2);
 		td2.appendChild(span2);
 		this.switchText = !this.switchText;
-		while (consolepane.childNodes.length > 25) {
+		while (consolepane.childNodes.length > 500) {
 			consolepane.removeChild(consolepane.firstChild);
 		}
 		scroller.scrollTop = scroller.scrollHeight;
-		document.getElementById('chat').focus();
+		if (this.focus) {
+			document.getElementById('chat').focus();
+		}
 	};
 
 	
@@ -505,9 +555,8 @@ function WebLiveChatListener() {
 	 * Such as a new user joined, private request, etc.
 	 */	
 	this.info = function(message) {
-		if (message == 'Info: pong') {
-			document.getElementById('response').innerHTML = message;
-			return;
+		if (this.nick == null) {
+			this.nick = this.connection.nick;
 		}
 		this.message(message);
 	};
@@ -542,10 +591,105 @@ function WebLiveChatListener() {
 		if (onlineList == null) {
 			return;
 		}
-		if (onlineList.hasChildNodes()) {
-			onlineList.removeChild(onlineList.firstChild);
+		onlineList.innerHTML = '';
+		var div = document.createElement('div');
+		div.innerHTML = usersXML;
+		var children = div.childNodes[0].childNodes;
+		var count = 0;
+		var length = children.length;
+		var ids = {};
+		// Add missing user
+		for (var i = 0; i < length; i++) {
+			var child = children[i - count];
+			ids[child.id] = child.id;
+			if (document.getElementById(child.id) == null) {
+				onlineList.appendChild(child);
+				count++;
+			}
 		}
-		onlineList.innerHTML = usersXML;
+		// Remove missing users
+		var onlineDiv = document.getElementById('online-div');
+		if (onlineDiv == null) {
+			return;
+		}
+		children = onlineDiv.childNodes;
+		count = 0;
+		length = children.length;
+		for (var i = 0; i < length; i++) {
+			var child = children[i - count];
+			if (child.id != 'online' && ids[child.id] == null) {
+				onlineDiv.removeChild(child);
+				count++;
+			}
+		}
+	};
+
+	/**
+	 * Decrease the size of the video element for the userid.
+	 */
+	this.shrinkVideo = function(user) {
+	    var id = 'user-' + encodeURIComponent(user);
+	    var userdiv = document.getElementById(id);
+	    if (userdiv != null) {
+	    	var media = userdiv.firstElementChild;	    	
+			if (media != null) {
+				media.height = media.height / 1.5;
+			}
+		}
+	};
+
+	/**
+	 * Increase the size of the video element for the userid.
+	 */
+	this.expandVideo = function(user) {
+	    var id = 'user-' + encodeURIComponent(user);
+	    var userdiv = document.getElementById(id);
+	    if (userdiv != null) {
+	    	var media = userdiv.firstElementChild;	    	
+			if (media != null) {
+				media.height = media.height * 1.5;
+			}
+		}
+	};
+
+	/**
+	 * Mute the audio for the userid.
+	 */
+	this.muteAudio = function(user) {
+	    var id = 'user-' + encodeURIComponent(user);
+	    var userdiv = document.getElementById(id);
+	    if (userdiv != null) {
+	    	var media = userdiv.firstElementChild;	    	
+			if (media != null) {
+				if (media.muted) {
+					if (user != this.nick) {
+						media.muted = false;
+					}
+				} else {
+					media.muted = true;					
+				}
+			}
+		}
+	};
+
+	/**
+	 * Mute the video for the userid.
+	 */
+	this.muteVideo = function(user) {
+	    var id = 'user-' + encodeURIComponent(user);
+	    var userdiv = document.getElementById(id);
+	    if (userdiv != null) {
+	    	var media = userdiv.firstElementChild;	    	
+			if (media != null) {
+				if (media.paused) {
+					media.play();
+					media.style.opacity = 100;
+				} else {
+					media.pause();
+					media.style.opacity = 0;					
+				}
+			}
+		}
 	};
 
 	this.toggleChime = function() {
@@ -569,6 +713,28 @@ function WebLiveChatListener() {
 		return false;
 	};
 
+	this.sendImage = function() {
+		if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
+			alert('The File APIs are not fully supported in this browser.');
+			return false;
+		}
+		var form = document.createElement("form");
+		form.enctype = "multipart/form-data";
+		form.method = "post";
+		form.name = "fileinfo";
+		var fileInput = document.createElement("input");
+		var self = this;
+		fileInput.name = "file";
+		fileInput.type = "file";
+		form.appendChild(fileInput);
+		fileInput.onchange = function() {
+			var file = fileInput.files[0];
+			self.connection.sendAttachment(file, true, form);
+		}
+		fileInput.click();
+		return false;
+	};
+
 	this.sendAttachment = function() {
 		if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
 			alert('The File APIs are not fully supported in this browser.');
@@ -585,7 +751,7 @@ function WebLiveChatListener() {
 		form.appendChild(fileInput);
 		fileInput.onchange = function() {
 			var file = fileInput.files[0];
-			self.connection.sendAttachment(file, form);
+			self.connection.sendAttachment(file, false, form);
 		}
 		fileInput.click();
 		return false;
@@ -614,12 +780,28 @@ function WebLiveChatListener() {
 		return false;
 	};
 
-	this.whisper = function() {
-		document.getElementById('chat').value = 'whisper: user: message';
+	this.whisper = function(user) {
+		if (user == null) {
+			user = 'user';
+		}
+		document.getElementById('chat').value = 'whisper: ' + user + ': message';
 		return false;
 	};
 
-	this.pvt = function() {
+	this.flag = function(user) {
+		if (user != null) {
+			document.getElementById('chat').value = 'flag: ' + user + ': reason';
+			return false;
+		}
+		document.getElementById('chat').value = 'flag: user: reason';
+		return false;
+	};
+
+	this.pvt = function(user) {
+		if (user != null) {
+			this.connection.pvt(user);
+			return false;
+		}
 		document.getElementById('chat').value = 'private: user';
 		return false;
 	};
@@ -637,43 +819,43 @@ function WebLiveChatListener() {
 /**
  * Shared method for updating an avatar image/video/audio from the chat response.
  */
-SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelaudio, afterFunction) {
+SDK.updateAvatar = function(responseMessage, speak, urlprefix, elementPrefix, channelaudio, afterFunction) {
 	if (elementPrefix == null) {
 		elementPrefix = "";
 	}
 	var avatarStatus = document.getElementById(elementPrefix + "avatar-status");
 	if (avatarStatus != null) {
 		var status = "";
-		if (response.emote != null && response.emote != "" && response.emote != "NONE") {
-			status = response.emote.toLowerCase();
+		if (responseMessage.emote != null && responseMessage.emote != "" && responseMessage.emote != "NONE") {
+			status = responseMessage.emote.toLowerCase();
 		}
-		if (response.action != null && response.action != "") {
+		if (responseMessage.action != null && responseMessage.action != "") {
 			if (status != "") {
 				status = status + " : ";
 			}
-			status = status + response.action;
+			status = status + responseMessage.action;
 		}
-		if (response.pose != null && response.pose != "") {
+		if (responseMessage.pose != null && responseMessage.pose != "") {
 			if (status != "") {
 				status = status + " : ";
 			}
-			status = status + response.pose;
+			status = status + responseMessage.pose;
 		}
 		avatarStatus.innerHTML = status;
 	}
-	if (response.avatarActionAudio != null) {
-		var audio = new Audio(urlprefix + response.avatarActionAudio);
+	if (responseMessage.avatarActionAudio != null) {
+		var audio = new Audio(urlprefix + responseMessage.avatarActionAudio);
 		audio.play();
 	}
 	if (SDK.backgroundAudio != null) {
 		SDK.backgroundAudio.pause();
 	}
-	if (response.avatarAudio != null) {
-		SDK.backgroundAudio = new Audio(urlprefix + response.avatarAudio);
+	if (responseMessage.avatarAudio != null) {
+		SDK.backgroundAudio = new Audio(urlprefix + responseMessage.avatarAudio);
 		SDK.backgroundAudio.loop = true;
 		SDK.backgroundAudio.play();
 	}
-	if (response.avatarType != null && response.avatarType.indexOf("video") != -1) {
+	if (responseMessage.avatarType != null && responseMessage.avatarType.indexOf("video") != -1) {
 		var div = document.getElementById(elementPrefix + "avatar-image-div");
 		if (div != null) {
 			div.style.display = "none";
@@ -681,24 +863,24 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
 		div = document.getElementById(elementPrefix + "avatar-video-div");
 		if (div != null) {
 			div.style.display = "inline-block";
-			if (response.avatarBackground != null) {
-				div.style.backgroundImage = "url(" + urlprefix + response.avatarBackground + ")";
+			if (responseMessage.avatarBackground != null) {
+				div.style.backgroundImage = "url(" + urlprefix + responseMessage.avatarBackground + ")";
 			}
 		}
 		var video = document.getElementById(elementPrefix + "avatar-video");
 		if (video == null) {
 			if (speak) {
-				var audio = SDK.play(urlprefix + response.speech, channelaudio);
+				var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
 				audio.onended = afterFunction;
 			}
 			return;
 		} else {
-			if (response.avatarBackground != null) {
-				video.poster = urlprefix + response.avatarBackground;				
+			if (responseMessage.avatarBackground != null) {
+				video.poster = urlprefix + responseMessage.avatarBackground;				
 			}
 		}
 		var end = function() {
-			video.src = urlprefix + response.avatar;
+			video.src = urlprefix + responseMessage.avatar;
 			video.loop = true;
 			video.play();
 			if (afterFunction != null) {
@@ -706,18 +888,18 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
 			}
 		}
 		var talk = function() {
-			if (response.avatarTalk != null) {
+			if (responseMessage.avatarTalk != null) {
 				if (speak) {
-					if (response.speech == null) {
+					if (responseMessage.speech == null) {
 						end();
 					} else {
-						video.src = urlprefix + response.avatar;
+						video.src = urlprefix + responseMessage.avatar;
 						video.loop = true;
-						//var audio = new Audio(urlprefix + response.speech, channelaudio);
-						var audio = SDK.play(urlprefix + response.speech, channelaudio);
+						//var audio = new Audio(urlprefix + responseMessage.speech, channelaudio);
+						var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
 						//audio.onabort = function() {console.log("abort");}
 						audio.oncanplay = function() {
-							video.src = urlprefix + response.avatarTalk;
+							video.src = urlprefix + responseMessage.avatarTalk;
 							video.loop = true;
 							video.play();
 						}
@@ -738,7 +920,7 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
 						video.play();
 					}
 				} else {
-					video.src = urlprefix + response.avatarTalk;
+					video.src = urlprefix + responseMessage.avatarTalk;
 					video.loop = false;
 					video.play();
 					video.onended = function() {
@@ -746,11 +928,11 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
 					}
 				}
 			} else {
-				video.src = urlprefix + response.avatar;
+				video.src = urlprefix + responseMessage.avatar;
 				video.loop = true;
 				video.play();
 				if (speak) {
-					var audio = SDK.play(urlprefix + response.speech, channelaudio);
+					var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
 					audio.onended = afterFunction;
 				} else if (afterFunction != null) {
 					afterFunction();			
@@ -758,8 +940,8 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
 			}
 		}
 		
-		if (response.avatarAction != null) {
-			video.src = urlprefix + response.avatarAction;
+		if (responseMessage.avatarAction != null) {
+			video.src = urlprefix + responseMessage.avatarAction;
 			video.loop = false;
 			video.play();
 			video.onended = function() {
@@ -779,14 +961,14 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
 		}
 		var img = document.getElementById(elementPrefix + 'avatar');
 		if (img != null) {
-			img.src = urlprefix + response.avatar;
+			img.src = urlprefix + responseMessage.avatar;
 		}
 		img = document.getElementById(elementPrefix + 'avatar2');
 		if (img != null) {
-			img.src = urlprefix + response.avatar;
+			img.src = urlprefix + responseMessage.avatar;
 		}
 		if (speak) {
-			var audio = SDK.play(urlprefix + response.speech, channelaudio);
+			var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
 			audio.onended = afterFunction;
 		} else if (afterFunction != null) {
 			afterFunction();			
@@ -798,24 +980,31 @@ SDK.updateAvatar = function(response, speak, urlprefix, elementPrefix, channelau
  * The WebChatbotListener provides an integration between a chat bot conversation through a SDKConnection and an HTML document.
  * It updates the document to messages received from the connection, and sends messages from the document's form.
  * The HTML document requires the following elements:
- * - chat - <input type='text'> chat text input for sending messages
- * - send - <input type='submit'> button for sending chat input
- * - response - <p> paragraph for last chat message
- * - console - <table> table for chat log, and avatar
- * - scroller - <div> div for chat log scroll pane
- * - avatar - <img> img for the bot's avatar (optional)
- * - avatar2 - <img> hover img for the bot's avatar (optional)
- * - avatar-image-div - <div> div for the bot's image (optional)
- * - avatar-video - <video> video for the bot's video (optional)
- * - avatar-video-div - <div> div for the bot's video (optional)
- * - avatar-status - <span> span for the bot's current status (optional)
+ * <ul>
+ * <li> chat - input (type='text') element for sending messages
+ * <li> send - input (type='submit') button for sending chat input
+ * <li> response - p element paragraph for last chat message
+ * <li> console - table element for chat log, and avatar
+ * <li> scroller - div element for chat log scroll pane
+ * <li> avatar - img element for the bot's avatar (optional)
+ * <li> avatar2 - img element hover img for the bot's avatar (optional)
+ * <li> avatar-image-div - div element for the bot's image (optional)
+ * <li> avatar-video - video element for the bot's video (optional)
+ * <li> avatar-video-div - div element for the bot's video (optional)
+ * <li> avatar-status - span element for the bot's current status (optional)
+ * </ul>
  * Or you can call createBox() to have the WebChatbotListener create its own components in the current page.
+ * @class
  */
 function WebChatbotListener() {
 	/** Set the caption for the button bar button. */
 	this.caption = null;
+	/** Disallow speech. */
+	this.allowSpeech = true;
 	/** Enable or disable speech. */
 	this.speak = true;
+	/** Enable or disable avatar. */
+	this.avatar = true;
 	/** A SDK connection must be set, be sure to include your app id. */
 	this.connection = null;
 	/** The id or name of the bot instance to connect to. */
@@ -834,6 +1023,12 @@ function WebChatbotListener() {
 	this.height = null;
 	/** Only apply the background color if not Chrome. */
 	this.backgroundIfNotChrome = false;
+	/** onresponse event is raised after a response is received. */
+	this.onresponse = null;
+	/** Configure if chat should be given focus after response. */
+	this.focus = true;
+	/** Override the URL used in the chat bot box popup. */
+	this.popupURL = null;
 	
 	this.switchText = true;
 	this.big = false;
@@ -868,6 +1063,7 @@ function WebChatbotListener() {
 			background = "background-size:" + this.width + "px auto;";
 			divWidth = minWidth;
 			divHeight = "min-height:" + this.width + "px;";
+			responseWidth = "width:" + (this.width - 16) + "px;";
 		}
 		if (this.height != null) {
 			minHeight = "height:" + this.height + "px;";
@@ -886,34 +1082,37 @@ function WebChatbotListener() {
 				+ ".box:hover { border:1px;border-style:solid;border-color:black; }\n"
 				+ ".box .boxmenu { visibility:" + hidden + "; }\n"
 				+ ".box:hover .boxmenu { visibility:visible; }\n"
-				+ "#boxclose, #boxmin, #boxmax { font-size:20px;margin:2px;padding:0px;text-decoration:none; }\n"
+				+ "#boxclose, #boxmin, #boxmax { font-size:22px;margin:2px;padding:0px;text-decoration:none; }\n"
 				+ "#boxbarmax { font-size:18px;margin:2px;padding:0px;text-decoration:none; }\n"
 				+ "#boxclose:hover, #boxmin:hover, #boxmax:hover { color: #fff;background: grey; }\n"
 				+ ".boxbar { position:fixed;bottom:2px;right:30px;z-index:52;margin:0;padding:6px;" + buttonstyle + " }\n"
 			+ "</style>\n"
 			+ "<div id='box' class='box' " + backgroundstyle + ">"
 				+ "<div class='boxmenu'>"
-				+ "<span style='float:right'><a id='boxmin' href='#'>&#95;</a><a id='boxmax' href='#'>&square;</a><a id='boxclose' href='#'>&times;</a></span><br/>"
-				+ "</div>"
-
+					+ "<span style='float:right'><a id='boxmin' href='#'>&#95;</a><a id='boxmax' href='#'>&square;</a><a id='boxclose' href='#'>&times;</a></span><br/>"
+				+ "</div>";
+		
+		if (this.avatar) {
+			html = html
 				+ "<div id='avatar-image-div' style='display:none;" + minHeight + minWidth + "'>"
 					+ "<img id='avatar' style='" + minHeight + minWidth + "'/>"
-					+ "</div>"
-					+ "<div id='avatar-video-div' style='display:none;" + divHeight + divWidth + background + "background-repeat: no-repeat;'>"
-					+ "<video id='avatar-video' autoplay preload='auto' style='background:transparent;" + minHeight + minWidth + "'>"
-					+ "Video format not supported by your browser (try Chrome)"
-					+ "</video>"
 				+ "</div>"
-				
+				+ "<div id='avatar-video-div' style='display:none;" + divHeight + divWidth + background + "background-repeat: no-repeat;'>"
+					+ "<video id='avatar-video' autoplay preload='auto' style='background:transparent;" + minHeight + minWidth + "'>"
+						+ "Video format not supported by your browser (try Chrome)"
+					+ "</video>"
+				+ "</div>";
+		}
+		html = html
 				+ "<div>"
-					+ "<div style='"+ minWidth + ";max-height:100px;overflow:auto;margin:10px;'>"
+					+ "<div style='"+ responseWidth + ";max-height:100px;overflow:auto;margin:8px;'>"
 						+ "<span id='response'></span><br/>"
 					+ "</div>"
 					+ "<span style='display:block;overflow:hidden;margin:2px;padding-right:4px'><input id='chat' type='text' style='width:100%'/></span>"
 				+ "</div>"
 			+ "</div>"
 			+ "<div id='boxbar' class='boxbar'>"
-			+ "<span><a id='boxbarmax' href='#' style='color:white'>" + this.caption + "</a></span>"
+				+ "<span><a id='boxbarmax' href='#' style='color:white'>" + this.caption + "</a></span>"
 			+ "</div>";
 		
 		box.innerHTML = html;
@@ -951,6 +1150,9 @@ function WebChatbotListener() {
 		var box = document.createElement('div');
 		if (this.color != null) {
 			buttonstyle = "background-color:" + this.color + ";";
+		}
+		if (label == null) {
+			label = "Live Chat";
 		}
 		if (position == null) {
 			position = (this.caption.length + label.length) * 8;
@@ -1024,7 +1226,19 @@ function WebChatbotListener() {
 		if (box != null) {
 			box.style.display = 'none';
 		}
-		SDK.popupwindow(SDK.url + '/chat?id=' + this.instance + '&embedded' + '&application=' + this.connection.credentials.applicationId ,'child', 600, 420);
+		var speech = this.speak;
+		if (!this.allowSpeech) {
+			speech = "disable";
+		}
+		var height = 520;
+		if (!this.avatar) {
+			height = 220;
+		}
+		if (this.popupURL != null) {
+			SDK.popupwindow(this.popupURL,'child', 700, height);
+		} else {
+			SDK.popupwindow(SDK.url + '/chat?id=' + this.instance + '&embedded&speak=' + speech + "&avatar=" + this.avatar + '&application=' + this.connection.credentials.applicationId ,'child', 700, height);
+		}
 		this.exit();
 		return false;
 	}
@@ -1035,7 +1249,12 @@ function WebChatbotListener() {
 	this.response = function(user, message) {
 		document.getElementById('response').innerHTML = SDK.linkURLs(message);
 		this.message(user, message);
-		document.getElementById('chat').focus();
+		if (this.focus) {
+			document.getElementById('chat').focus();
+		}
+		if (this.onresponse != null) {
+			this.onresponse(message);
+		}
 	}
 	
 	/**
@@ -1062,6 +1281,7 @@ function WebChatbotListener() {
 		span.innerHTML = speaker;
 		span2.className = chatClass;
 		span2.innerHTML = SDK.linkURLs(message);
+		td.className = 'chat-user';
 		td.setAttribute('nowrap', 'nowrap');
 		td2.className = chatClass;
 		td2.setAttribute('align', 'left');
@@ -1072,7 +1292,7 @@ function WebChatbotListener() {
 		tr.appendChild(td2);
 		td2.appendChild(span2);
 		this.switchText = !this.switchText;
-		while (chatconsole.childNodes.length > 50) {
+		while (chatconsole.childNodes.length > 500) {
 			chatconsole.removeChild(chatconsole.firstChild);
 		}
 		scroller.scrollTop = scroller.scrollHeight;
@@ -1081,9 +1301,9 @@ function WebChatbotListener() {
 	/**
 	 * Update the bot's avatar's image/video/audio from the chat response.
 	 */
-	this.updateAvatar = function(response) {
+	this.updateAvatar = function(responseMessage) {
 		var urlprefix = this.connection.credentials.url + "/";
-		SDK.updateAvatar(response, this.speak, urlprefix);
+		SDK.updateAvatar(responseMessage, this.speak, urlprefix);
 	};
 
 	this.toggleSpeak = function() {
@@ -1110,11 +1330,11 @@ function WebChatbotListener() {
 		chat.instance = this.instance;
 		chat.speak = this.speak;
 		var self = this;
-		this.connection.chat(chat, function(response) {
-			self.conversation = response.conversation;
-			self.updateAvatar(response);
-			if (response.message != null) {
-				self.response(self.instanceName, response.message);
+		this.connection.chat(chat, function(responseMessage) {
+			self.conversation = responseMessage.conversation;
+			self.updateAvatar(responseMessage);
+			if (responseMessage.message != null) {
+				self.response(self.instanceName, responseMessage.message);
 			}
 		});
 		return false;
@@ -1137,6 +1357,18 @@ function WebChatbotListener() {
 				chat.correction = true;
 				correction.checked = false;
 			}
+			var learning = document.getElementById('learning');
+			if (learning != null) {
+				chat.learn = learning.checked;
+			}
+			var debug = document.getElementById('debug');
+			if (debug != null && debug.checked) {
+				chat.debug = true;
+				var debugLevel = document.getElementById('debugLevel');
+				if (debugLevel != null) {
+					chat.debugLevel = debugLevel.value;
+				}
+			}
 			var offensive = document.getElementById('offensive');
 			if (offensive != null && offensive.checked) {
 				chat.offensive = true;
@@ -1155,10 +1387,15 @@ function WebChatbotListener() {
 			var self = this;
 			document.getElementById('response').innerHTML = '<i>thinking</i>';
 			document.getElementById('chat').value = '';
-			this.connection.chat(chat, function(response) {
-				self.conversation = response.conversation;
-				self.response(self.instanceName, response.message);
-				self.updateAvatar(response);
+			this.connection.chat(chat, function(responseMessage) {
+				self.conversation = responseMessage.conversation;
+				self.response(self.instanceName, responseMessage.message);
+				self.updateAvatar(responseMessage);
+				var log = document.getElementById('log');
+				var logText = responseMessage.log;
+				if (log != null && logText != null) {
+					log.innerHTML = logText;
+				}
 			});
 		}
 		return false;
@@ -1176,7 +1413,7 @@ function WebChatbotListener() {
 		chat.instance = this.instance;
 		chat.conversation = this.conversation;
 		var self = this;
-		this.connection.chat(chat, function(response) {
+		this.connection.chat(chat, function(responseMessage) {
 			self.connection.disconnect();
 			self.clear();
 			self.conversation = null;
@@ -1203,32 +1440,16 @@ function WebChatbotListener() {
 		var avatarVideoDiv = document.getElementById("avatar-video-div");
 		var scroller = document.getElementById("scroller");
 		if (!this.big) {
-			avatar.style.width = "auto";
-			avatar.style.maxWidth = "800px";
-			avatar.style.height = "400px";
-			avatarVideo.style.maxWidth = "800px";
-			avatarVideo.style.width = "auto";
-			avatarVideo.style.height = "400px";
+			avatar.className = "avatar-big";
+			avatarVideo.className = "avatar-video-big";
+			avatarVideoDiv.className = "avatar-video-div-big";
 			scroller.style.display = "none";
-			avatarVideoDiv.style.minHeight = "400px";
-			avatarVideoDiv.style.minWidth = "400px";
-			avatarDiv.style.minHeight = "400px";
-			avatarDiv.style.minWidth = "400px";
-			avatarVideoDiv.style.backgroundSize = "auto 400px";
 			this.big = true;
 		} else {
-			avatar.style.width = "200px";
-			avatar.style.maxHeight = "400px";
-			avatar.style.height = "auto";
-			avatarVideo.style.maxHeight = "400px";
-			avatarVideo.style.width = "200px";
-			avatarVideo.style.height = "auto";
+			avatar.className = "avatar";
+			avatarVideo.className = "avatar-video";
+			avatarVideoDiv.className = "avatar-video-div";
 			scroller.style.display = "inline-block";
-			avatarVideoDiv.style.minHeight = "200px";
-			avatarVideoDiv.style.minWidth = "200px";
-			avatarDiv.style.minHeight = "200px";
-			avatarDiv.style.minWidth = "200px";
-			avatarVideoDiv.style.backgroundSize = "200px auto";
 			this.big = false;
 		}
 		return false;
@@ -1239,11 +1460,14 @@ function WebChatbotListener() {
  * The WebAvatar provides access to an avatar and binds it to elements in an HTML document.
  * It lets you use a bot avatar without having a bot.  You can tell the avatar what to say, and what actions and poses to display.
  * The HTML document requires the following elements:
- * - avatar - <img> img for the avatar
- * - avatar-image-div - <div> div for the avatar's image
- * - avatar-video - <video> video for the avatar's video
- * - avatar-video-div - <div> div for the avatar's video
+ * <ul>
+ * <li> avatar - img element for the avatar
+ * <li> avatar-image-div - div element for the avatar's image
+ * <li> avatar-video - video element for the avatar's video
+ * <li> avatar-video-div - div element for the avatar's video
+ * </ul>
  * Or you can call createBox() to have the WebAvatar create its own components in the current page.
+ * @class
  */
 function WebAvatar() {
 	/** Enable or disable speech. */
@@ -1313,7 +1537,7 @@ function WebAvatar() {
 				+ ".avatarbox:hover { border:1px;border-style:solid;border-color:black; }\n"
 				+ ".avatarbox .avatarboxmenu { visibility:" + hidden + "; }\n"
 				+ ".avatarbox:hover .avatarboxmenu { visibility:visible; }\n"
-				+ "#avatarboxclose { font-size:18px;margin:2px;padding:0px;text-decoration:none; }\n"
+				+ "#avatarboxclose { font-size:22px;margin:2px;padding:0px;text-decoration:none; }\n"
 				+ "#avatarboxclose:hover { color: #fff;background: grey; }\n"
 			+ "</style>\n"
 			+ "<div id='avatarbox' class='avatarbox' " + backgroundstyle + ">"
@@ -1369,9 +1593,9 @@ function WebAvatar() {
 	/**
 	 * Update the bot's avatar's image/video/audio from the chat response.
 	 */
-	this.updateAvatar = function(response, afterFunction) {
+	this.updateAvatar = function(responseMessage, afterFunction) {
 		var urlprefix = this.connection.credentials.url + "/";
-		SDK.updateAvatar(response, this.speak, urlprefix, this.elementPrefix, false, afterFunction);
+		SDK.updateAvatar(responseMessage, this.speak, urlprefix, this.elementPrefix, false, afterFunction);
 	};
 	
 	/**
@@ -1411,8 +1635,8 @@ function WebAvatar() {
 		var self = this;
 		var message = this.messages[0];
 		this.messages = this.messages.splice(1, this.messages.length);
-		this.connection.avatarMessage(message, function(response) {
-			self.updateAvatar(response, function() {
+		this.connection.avatarMessage(message, function(responseMessage) {
+			self.updateAvatar(responseMessage, function() {
 				setTimeout(function() {
 					self.processMessages(pause);
 				}, pause);
@@ -1435,8 +1659,8 @@ function WebAvatar() {
 		config.action = action;
 		config.pose = pose;
 		var self = this;
-		this.connection.avatarMessage(config, function(response) {
-			self.updateAvatar(response, afterFunction);
+		this.connection.avatarMessage(config, function(responseMessage) {
+			self.updateAvatar(responseMessage, afterFunction);
 		});
 		return false;
 	};
@@ -1446,6 +1670,18 @@ function WebAvatar() {
  * Connection class for a Live Chat, or chatroom connection.
  * A live chat connection is different than an SDKConnection as it is asynchronous,
  * and uses web sockets for communication.
+ * @class
+ * @property channel
+ * @property user
+ * @property credentials
+ * @property listener
+ * @property keepAlive
+ * @property onMediaStream
+ * @property onMediaStreamEnded
+ * @property nick
+ * @property channelToken
+ * @property onNewChannel
+ * @property nick
  */
 function LiveChatConnection() {
 	this.channel = null;
@@ -1455,9 +1691,16 @@ function LiveChatConnection() {
 	this.listener = null;
 	this.keepAlive = false;
 	this.keepAliveInterval = null;
+	this.mediaConnection = null;
+	this.onMediaStream = null;
+	this.onMediaStreamEnded = null;
+	this.nick = null;
+	this.channelToken = null;
+	this.onNewChannel = null;
+	this.onMessageCallbacks = {};
 		
 	/**
-	 * Connection to the live chat server channel.
+	 * Connect to the live chat server channel.
 	 * Validate the user credentials.
 	 * This call is asynchronous, any error or success with be sent as a separate message to the listener.
 	 */
@@ -1467,7 +1710,15 @@ function LiveChatConnection() {
 		}
 		this.channel = channel;
 		this.user = user;
-		var host = "ws://" + this.credentials.host + this.credentials.app + "/live/chat";
+		if (this.nick == null && this.user != null) {
+			this.nick = this.user.user;
+		}
+		var host = null;
+		if (SDK.scheme == "https") {
+			host = "wss://" + this.credentials.host + this.credentials.app + "/live/chat";
+		} else {
+			host = "ws://" + this.credentials.host + this.credentials.app + "/live/chat";			
+		}
 		if ('WebSocket' in window) {
 			this.socket = new WebSocket(host);
 		} else if ('MozWebSocket' in window) {
@@ -1501,6 +1752,7 @@ function LiveChatConnection() {
 		this.socket.onclose = function () {
 			self.listener.message("Info: Closed");
 			self.listener.closed();
+			self.disconnectMedia();
 		};
 		
 		this.socket.onmessage = function (message) {
@@ -1512,12 +1764,40 @@ function LiveChatConnection() {
 	    		user = text.substring(0, index);
 	    		data = text.substring(index + 2, text.length);
 	    	}
+			if (user == "Media") {
+			    data = JSON.parse(data);
+
+			    if (data.sender == self.nick) {
+			    	return;
+			    }
+			    if (data.channel != self.channelToken) {
+			    	return;
+			    }
+
+			    if (self.onMessageCallbacks[data.channel]) {
+			    	self.onMessageCallbacks[data.channel](data.message);
+			    };
+			    return;
+			}
 			if (user == "Online-xml") {
 				self.listener.updateUsersXML(data);
 				return;
 			}
 			if (user == "Online") {
 				self.listener.updateUsers(data);
+				return;
+			}
+			if (user == "Channel") {
+				self.channelToken = data;
+				if (self.onNewChannel != null) {
+					self.onNewChannel(data);
+				}
+				return;
+			}
+			if (user == "Nick") {
+				if (self.nick == null) {
+					self.nick = data;
+				}
 				return;
 			}
 			
@@ -1537,6 +1817,182 @@ function LiveChatConnection() {
 	};
 
 	/**
+	 * Connect to the active channels media feed (video, audio).
+	 */
+	this.connectMedia = function(mediaChannel, shareAudio, shareVideo) {
+		if (this.mediaConnection != null) {
+			this.mediaConnection.leave();
+		}
+		this.mediaConnection = new RTCMultiConnection(mediaChannel);
+		var self = this;
+		var open = false;
+		this.mediaConnection.session = {
+		    audio: shareAudio,
+		    video: shareVideo
+		};
+		/*this.mediaConnection.mediaConstraints.audio = {
+		    mandatory: {},
+		    optional: [{
+		        googEchoCancellation: true,
+		        googAutoGainControl: true,
+		        googNoiseSuppression: true,
+		        googHighpassFilter: true,
+		        googTypingNoiseDetection: true,
+		        googAudioMirroring: true
+		    }]
+		};*/
+		/*this.mediaConnection.privileges = {
+		    canStopRemoteStream: true,
+		    canMuteRemoteStream: true
+		};*/
+
+		this.mediaConnection.openSignalingChannel = function (config) {
+		    var channel = config.channel || this.channel;
+		    self.onMessageCallbacks[channel] = config.onmessage;
+
+		    if (config.onopen) {
+		    	setTimeout(config.onopen, 1000);
+		    }
+
+		    // directly returning socket object using "return" statement
+		    return {
+		        send: function (message) {
+		            self.socket.send("Media: " + JSON.stringify({
+		                sender: self.nick,
+		                channel: channel,
+		                message: message
+		            }));
+		        },
+		        channel: channel
+		    };
+		};
+		this.mediaConnection.onstream = function(stream) {
+			open = true;
+			if (self.onMediaStream != null) {
+				self.onMediaStream(stream);
+			}
+		};
+		this.mediaConnection.onstreamended = function(stream) {
+			if (self.onMediaStreamEnded != null) {
+				self.onMediaStreamEnded(stream);
+			}
+		};
+		this.mediaConnection.onNewSession = function(session) {
+		    session.join({
+			    audio: shareAudio,
+			    video: shareVideo
+			});
+		};
+		if (this.nick != null) {
+			this.mediaConnection.userid = this.nick;
+		}
+		//connection.log = false;
+		this.mediaConnection.onerror = function(error) {
+			SDK.error(error);
+		}
+		this.mediaConnection.onMediaError = function(error) {
+			SDK.error(error);
+		}
+		this.mediaConnection.connect();
+	    setTimeout(function() {
+	    	if (!open) {
+	    		self.mediaConnection.open("room");
+	    	}
+	    }, 5000);
+	}
+	
+	/**
+	 * Disconnect from the active channels media feed (video, audio).
+	 */
+	this.disconnectMedia = function() {
+		if (this.mediaConnection != null) {
+			this.mediaConnection.leave();
+			this.mediaConnection = null;
+		}
+	}
+	
+	/**
+	 * Reset the media feed (audio, video).
+	 */
+	this.resetMedia = function(shareAudio, shareVideo) {
+		this.mediaConnection.session = {
+		    audio: shareAudio,
+		    video: shareVideo
+		};
+		for (var streamid in this.mediaConnection.localStreams) {
+			var stream = this.mediaConnection.streams[streamid];
+			if (!shareAudio || !shareVideo) {
+				stream.mute({
+				    audio: !shareAudio,
+				    video: !shareVideo
+				});
+			}
+			if (shareAudio || shareVideo) {
+				stream.unmute({
+				    audio: shareAudio,
+				    video: shareVideo
+				});
+			}
+		}
+	}
+
+	/**
+	 * Decrease the size of the video element for the userid.
+	 */
+	this.shrinkVideo = function(user) {
+		var streams = this.mediaConnection.streams.selectAll({remote:true, local:true});
+		for (i = 0; i < streams.length; i++) {
+			stream = streams[i];
+			if (stream.userid == user) {
+			    stream.mediaElement.height = stream.mediaElement.height / 1.5;
+			}
+		}
+	};
+
+	/**
+	 * Increase the size of the video element for the userid.
+	 */
+	this.expandVideo = function(user) {
+		var streams = this.mediaConnection.streams.selectAll({remote:true, local:true});
+		for (i = 0; i < streams.length; i++) {
+			stream = streams[i];
+			if (stream.userid == user) {
+			    stream.mediaElement.height = stream.mediaElement.height * 1.5;
+			}
+		}
+	};
+
+	/**
+	 * Mute the audio for the userid.
+	 */
+	this.muteAudio = function(user) {
+		var streams = this.mediaConnection.streams.selectAll({remote:true, local:true});
+		for (i = 0; i < streams.length; i++) {
+			stream = streams[i];
+			if (stream.userid == user) {
+			    stream.mute({
+			        audio: true
+			    });
+			}
+		}
+	};
+
+	/**
+	 * Mute the video for the userid.
+	 */
+	this.muteVideo = function(user) {
+		var streams = this.mediaConnection.streams.selectAll({remote:true, local:true});
+		for (i = 0; i < streams.length; i++) {
+			stream = streams[i];
+			if (stream.userid == user) {
+			    stream.mute({
+			        video: true
+			    });
+			}
+		}			
+	};
+
+	/**
 	 * Sent a text message to the channel.
 	 * This call is asynchronous, any error or success with be sent as a separate message to the listener.
 	 * Note, the listener will receive its own messages.
@@ -1546,7 +2002,7 @@ function LiveChatConnection() {
 		this.socket.send(message);
 	};
 
-	this.sendAttachment = function(file, form) {
+	this.sendAttachment = function(file, resize, form) {
 		var self = this;
 		var media = new MediaConfig();
 		if (this.channel == null) {
@@ -1556,14 +2012,14 @@ function LiveChatConnection() {
 		media.instance = this.channel.id;
 		media.name = file.name;
 		media.type = file.type;
-		if (file.size > SDK.MAX_FILE_UPLOAD) {
-			this.listener.error("File exceeds maximum upload size of " + SDK.MAX_FILE_UPLOAD);
+		if (!resize && file.size > SDK.MAX_FILE_UPLOAD) {
+			this.listener.error("File exceeds maximum upload size of " + (SDK.MAX_FILE_UPLOAD / 1000000) + "meg");
 		} else {
 			this.sdk.error = function(message) {
 				self.listener.error(message);
 			}
-			this.sdk.createChannelAttachment(media, form, function(media) {
-				var message = "file: " + file.name + " : " + file.type + " : " + self.sdk.fetchImage(media.file);
+			this.sdk.createChannelAttachment(media, file, resize, form, function(media) {
+				var message = "file: " + file.name + " : " + file.type + " : " + self.sdk.fetchLink(media.file);
 				self.sendMessage(message);
 			})
 		}
@@ -1636,6 +2092,7 @@ function LiveChatConnection() {
     	if (this.socket != null) {
     		this.socket.disconnect();
     	}
+    	disconnectMedia();
 	};
 	
 	this.checkSocket = function() {
@@ -1674,6 +2131,12 @@ function LiveChatConnection() {
 * <li> Live chat access, chat, and administration
 * <li> Domain access, and administration
 * </ul>
+ * @class
+ * @property user
+ * @property domain
+ * @property credentials
+ * @property debug
+ * @property error
 */
 function SDKConnection() {
 	this.user;
@@ -1759,6 +2222,13 @@ function SDKConnection() {
 	}
 	
 	/**
+	 * Fetch the URL for the image from the server.
+	 */	
+	this.fetchLink = function(image) {
+		return this.credentials.url + "/" + image;
+	}
+	
+	/**
 	 * Fetch the forum post details for the forum post id.
 	 */	
 	this.fetchForumPost = function(config, processor) {
@@ -1792,17 +2262,99 @@ function SDKConnection() {
 	/**
 	 * Create a new file/image/media attachment for a chat channel.
 	 */
-	this.createChannelAttachment = function(config, form, processor) {
+	this.createChannelAttachment = function(config, file, resize, form, processor) {
 		config.addCredentials(this);
-		this.POST_FILE(this.credentials.rest + "/create-channel-attachment", form, config.toXML(), function(xml) {
-			if (xml == null) {
-				return null;
-			}
-			var media = new MediaConfig();
-			media.parseXML(xml);
-			processor(media);
-		});
+		if (resize) {
+			this.POST_IMAGE(this.credentials.rest + "/create-channel-attachment", file, form, config.toXML(), function(xml) {
+				if (xml == null) {
+					return null;
+				}
+				var media = new MediaConfig();
+				media.parseXML(xml);
+				processor(media);
+			});
+		} else {
+			this.POST_FILE(this.credentials.rest + "/create-channel-attachment", form, config.toXML(), function(xml) {
+				if (xml == null) {
+					return null;
+				}
+				var media = new MediaConfig();
+				media.parseXML(xml);
+				processor(media);
+			});
+		}
 	}
+
+	/**
+	 * Create a new file/image/media attachment for a forum.
+	 */
+	this.createForumAttachment = function(config, file, resize, form, processor) {
+		config.addCredentials(this);
+		if (resize) {
+			this.POST_IMAGE(this.credentials.rest + "/create-forum-attachment", file, form, config.toXML(), function(xml) {
+				if (xml == null) {
+					return null;
+				}
+				var media = new MediaConfig();
+				media.parseXML(xml);
+				processor(media);
+			});
+		} else {
+			this.POST_FILE(this.credentials.rest + "/create-forum-attachment", form, config.toXML(), function(xml) {
+				if (xml == null) {
+					return null;
+				}
+				var media = new MediaConfig();
+				media.parseXML(xml);
+				processor(media);
+			});
+		}
+	}
+
+	/**
+	 * Create a new file/image/media attachment for a forum and insert the http link into the textarea.
+	 */
+	this.uploadForumAttachment = function(forum, resize, processor) {
+		if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
+			this.error('The File APIs are not fully supported in this browser.');
+			return false;
+		}
+		var form = document.createElement("form");
+		form.enctype = "multipart/form-data";
+		form.method = "post";
+		form.name = "fileinfo";
+		var fileInput = document.createElement("input");
+		var self = this;
+		fileInput.name = "file";
+		fileInput.type = "file";
+		form.appendChild(fileInput);
+		fileInput.onchange = function() {
+			var file = fileInput.files[0];
+			self.uploadForumFile(file, forum, resize, form, processor);
+		}
+		fileInput.click();
+	};
+
+	/**
+	 * Create a new file/image/media attachment for a forum.
+	 */
+	this.uploadForumFile = function(file, forum, resize, form, processor) {
+		var self = this;
+		var media = new MediaConfig();
+		media.instance = forum;
+		media.name = file.name;
+		media.type = file.type;
+		if (!resize && file.size > SDK.MAX_FILE_UPLOAD) {
+			this.error("File exceeds maximum upload size of " + (SDK.MAX_FILE_UPLOAD / 1000000) + "meg");
+		} else {
+			this.createForumAttachment(media, file, resize, form, function(media) {
+				var link = self.fetchLink(media.file);
+				if (processor != null) {
+					processor(link, file.name);
+				}
+			})
+		}
+	};
 	
 	/**
 	 * Create a new forum post.
@@ -1846,9 +2398,9 @@ function SDKConnection() {
 			if (xml == null) {
 				return null;
 			}
-			var config = new config.constructor();
-			config.parseXML(xml);
-			processor(config)
+			var config2 = new config.constructor();
+			config2.parseXML(xml);
+			processor(config2)
 		});
 	}
 	
@@ -1929,9 +2481,9 @@ function SDKConnection() {
 			if (xml == null) {
 				return null;
 			}
-			var response = new ChatResponse();
-			response.parseXML(xml);
-			processor(response);			
+			var responseMessage = new ChatResponse();
+			responseMessage.parseXML(xml);
+			processor(responseMessage);			
 		});
 	}
 	
@@ -1944,16 +2496,16 @@ function SDKConnection() {
 			if (xml == null) {
 				return null;
 			}
-			var response = new ChatResponse();
-			response.parseXML(xml);
-			processor(response);			
+			var responseMessage = new ChatResponse();
+			responseMessage.parseXML(xml);
+			processor(responseMessage);			
 		});
 	}
 	
 	/**
 	 * Return the list of user details for the comma separated values list of user ids.
 	 */
-	this.fetchUsers = function(usersCSV, processor) {
+	this.fetchAllUsers = function(usersCSV, processor) {
 		var config = new UserConfig();
 		config.user = usersCSV;
 		config.addCredentials(this);
@@ -2046,15 +2598,25 @@ function SDKConnection() {
 	/**
 	 * Return the bot's voice configuration.
 	 */
+	this.trainInstance = function(config) {
+		config.addCredentials(this);
+		this.POST(this.credentials.rest + "/train-instance", config.toXML(), function(xml) {
+			return;
+		});
+	}
+	
+	/**
+	 * Return the bot's voice configuration.
+	 */
 	this.fetchVoice = function(config, processor) {
 		config.addCredentials(this);
-		xml = (this.credentials.rest + "/get-voice", config.toXML(), function(xml) {
+		this.POST(this.credentials.rest + "/get-voice", config.toXML(), function(xml) {
 			if (xml == null) {
 				return;
 			}
 			var voice = new VoiceConfig();
 			voice.parseXML(xml);
-			processor(voice);			
+			processor(voice);
 		});
 	}
 	
@@ -2167,7 +2729,6 @@ function SDKConnection() {
 		var request = new XMLHttpRequest();
 		var formData = new FormData(form);
 		formData.append("xml", xml);
-		console.log(formData);
 		var debug = this.debug;
 		var self = this;
 		request.onreadystatechange = function() {
@@ -2196,10 +2757,84 @@ function SDKConnection() {
 		//request.setRequestHeader("Content-Type", "multipart/form-data");
 		request.send(formData);
 	}
+	
+	this.POST_IMAGE = function(url, file, form, xml, processor) {
+		var self = this;
+		var debug = this.debug;
+		var reader = new FileReader();
+		reader.onloadend = function() {
+			var tempImg = new Image();
+			tempImg.src = reader.result;
+			tempImg.onload = function() {
+				var MAX_WIDTH = 300;
+				var MAX_HEIGHT = 300;
+				var tempW = tempImg.width;
+				var tempH = tempImg.height;
+				if (tempW > tempH) {
+					if (tempW > MAX_WIDTH) {
+						 tempH *= MAX_WIDTH / tempW;
+						 tempW = MAX_WIDTH;
+					}
+				} else {
+					if (tempH > MAX_HEIGHT) {
+						 tempW *= MAX_HEIGHT / tempH;
+						 tempH = MAX_HEIGHT;
+					}
+				}
+				var canvas = document.createElement('canvas');
+				canvas.width = tempW;
+				canvas.height = tempH;
+				var ctx = canvas.getContext("2d");
+				ctx.fillStyle = '#fff';
+				ctx.fillRect(0, 0, canvas.width, canvas.height);				
+				ctx.drawImage(this, 0, 0, tempW, tempH);
+	            var dataUrl = canvas.toDataURL('image/jpeg');
+	            var blob = SDK.dataURLToBlob(dataUrl);
+
+				var request = new XMLHttpRequest();
+				var formData = new FormData();
+				formData.append("xml", xml);
+				formData.append('file', blob, file.name);
+				request.onreadystatechange = function() {
+					if (debug) {
+						console.log(request.readyState);
+						console.log(request.status);
+						console.log(request.statusText);
+						console.log(request.responseText);
+						console.log(request.responseXML);
+					}
+					if (request.readyState != 4) return;
+					if (request.status != 200 && request.status != 204) {
+						console.log('Error: SDK POST web request failed');
+						if (debug) {
+							console.log(request.statusText);
+							console.log(request.responseText);
+							console.log(request.responseXML);
+						}
+						self.error(request.responseText);
+						return;
+					}
+					processor(request.responseXML.childNodes[0]);
+				};
+				
+				request.open('POST', url, true);
+				//request.setRequestHeader("Content-Type", "multipart/form-data");
+				request.send(formData);
+			}
+		 }
+		 reader.readAsDataURL(file);
+	}
 }
 
 /**
  * DTO for XML config.
+ * @class
+ * @property application
+ * @property domain
+ * @property user
+ * @property token
+ * @property instance
+ * @property type
  */
 function Config() {
 	this.application;
@@ -2245,6 +2880,23 @@ function Config() {
 
 /**
  * DTO for XML user creation config.
+ * @class
+ * @property password
+ * @property newPassword
+ * @property hint
+ * @property name
+ * @property showName
+ * @property email
+ * @property website
+ * @property bio
+ * @property over18
+ * @property avatar
+ * @property connects
+ * @property bots
+ * @property posts
+ * @property messages
+ * @property joined
+ * @property lastConnect
  */
 function UserConfig() {
 	this.password;
@@ -2337,10 +2989,20 @@ function UserConfig() {
 		
 }
 UserConfig.prototype = new Config();
+UserConfig.prototype.constructor = UserConfig;
 UserConfig.constructor = UserConfig;
 
 /**
  * DTO for XML chat message config.
+ * @class
+ * @property conversation
+ * @property speak
+ * @property correction
+ * @property offensive
+ * @property disconnect
+ * @property emote
+ * @property action
+ * @property message
  */
 function ChatConfig() {	
 	this.conversation;
@@ -2351,6 +3013,9 @@ function ChatConfig() {
 	this.emote;
 	this.action;
 	this.message;
+	this.debug;
+	this.debugLevel;
+	this.learn;
 	
 	this.toXML = function() {
 		var xml = "<chat";
@@ -2373,6 +3038,15 @@ function ChatConfig() {
 		if (this.offensive) {
 			xml = xml + (" offensive=\"" + this.offensive + "\"");
 		}
+		if (this.learn != null) {
+			xml = xml + (" learn=\"" + this.learn + "\"");
+		}
+		if (this.debug) {
+			xml = xml + (" debug=\"" + this.debug + "\"");
+		}
+		if (this.debugLevel != null) {
+			xml = xml + (" debugLevel=\"" + this.debugLevel + "\"");
+		}
 		if (this.disconnect) {
 			xml = xml + (" disconnect=\"" + this.disconnect + "\"");
 		}
@@ -2388,10 +3062,29 @@ function ChatConfig() {
 	}
 }
 ChatConfig.prototype = new Config();
+ChatConfig.prototype.constructor = ChatConfig;
 ChatConfig.constructor = ChatConfig;
 
 /**
  * DTO for XML chat response config.
+ * @class
+ * @property conversation
+ * @property avatar
+ * @property avatarType
+ * @property avatarTalk
+ * @property avatarTalkType
+ * @property avatarAction
+ * @property avatarActionType
+ * @property avatarActionAudio
+ * @property avatarActionAudioType
+ * @property avatarAudio
+ * @property avatarAudioType
+ * @property avatarBackground
+ * @property speech
+ * @property message
+ * @property emote
+ * @property action
+ * @property pose
  */
 function ChatResponse() {	
 	this.conversation;
@@ -2411,7 +3104,7 @@ function ChatResponse() {
 	this.emote;
 	this.action;
 	this.pose;
-
+	this.log;
 
 	this.parseXML = function(element) {
 		this.conversation = element.getAttribute("conversation");
@@ -2446,13 +3139,32 @@ function ChatResponse() {
 				this.message = this.message.replace(/&gt;/g, ">");
 			}
 		}
+		
+		node = element.getElementsByTagName("log")[0];
+		if (node != null) {
+			this.log = SDK.innerHTML(node);
+			if (this.log == null) {
+				var div = document.createElement("div");
+				div.appendChild(node);
+				this.log = div.innerHTML;
+			}
+		}
 	}
 }
 ChatResponse.prototype = new Config();
+ChatResponse.prototype.constructor = ChatResponse;
 ChatResponse.constructor = ChatResponse;
 
 /**
  * DTO for XML avatar message config.
+ * @class
+ * @property avatar
+ * @property speak
+ * @property voice
+ * @property message
+ * @property emote
+ * @property action
+ * @property pose
  */
 function AvatarMessage() {	
 	this.avatar;
@@ -2496,10 +3208,18 @@ function AvatarMessage() {
 	}
 }
 AvatarMessage.prototype = new Config();
+AvatarMessage.prototype.constructor = AvatarMessage;
 AvatarMessage.constructor = AvatarMessage;
 
 /**
  * DTO for XML browse options.
+ * @class
+ * @property type
+ * @property typeFilter
+ * @property category
+ * @property tag
+ * @property filter
+ * @property sort
  */
 function BrowseConfig() {
 	this.type;
@@ -2533,10 +3253,35 @@ function BrowseConfig() {
 	}
 }
 BrowseConfig.prototype = new Config();
+BrowseConfig.prototype.constructor = BrowseConfig;
 BrowseConfig.constructor = BrowseConfig;
 
 /**
  * DTO for XML web medium config.
+ * @class
+ * @property id
+ * @property name
+ * @property isAdmin
+ * @property isAdult
+ * @property isPrivate
+ * @property isHidden
+ * @property accessMode
+ * @property isFlagged
+ * @property description
+ * @property details
+ * @property disclaimer
+ * @property tags
+ * @property categories
+ * @property flaggedReason
+ * @property creator
+ * @property creationDate
+ * @property lastConnectedUser
+ * @property license
+ * @property avatar
+ * @property connects
+ * @property dailyConnects
+ * @property weeklyConnects
+ * @property monthlyConnects
  */
 function WebMediumConfig() {
 	this.id;
@@ -2564,7 +3309,7 @@ function WebMediumConfig() {
 	this.monthlyConnects;
 
 	this.writeWebMediumXML = function(xml) {
-		xml = xml + this.writeCredentials(xml);
+		xml = this.writeCredentials(xml);
 		if (this.id != null) {
 			xml = xml + (" id=\"" + this.id + "\"");
 		}
@@ -2622,6 +3367,7 @@ function WebMediumConfig() {
 			xml = xml + (this.flaggedReason);
 			xml = xml + ("</flaggedReason>");
 		}
+		return xml;
 	}
 	
 	this.parseWebMediumXML = function(element) {
@@ -2680,10 +3426,16 @@ function WebMediumConfig() {
 	}
 }
 WebMediumConfig.prototype = new Config();
+WebMediumConfig.prototype.constructor = WebMediumConfig;
 WebMediumConfig.constructor = WebMediumConfig;
 
 /**
  * DTO for XML channel config.
+ * @class
+ * @property type
+ * @property messages
+ * @property usersOnline
+ * @property adminsOnline
  */
 function ChannelConfig() {
 	this.type;
@@ -2704,7 +3456,7 @@ function ChannelConfig() {
 		if (this.type != null && this.type != "") {
 			xml = xml + (" type=\"" + this.type + "\"");
 		}
-		this.writeWebMediumXML(writer);
+		xml = this.writeWebMediumXML(xml);
 		xml = xml + ("</channel>");
 		return xml;
 	}
@@ -2718,10 +3470,13 @@ function ChannelConfig() {
 	}
 }
 ChannelConfig.prototype = new WebMediumConfig();
+ChannelConfig.prototype.constructor = ChannelConfig;
 ChannelConfig.constructor = ChannelConfig;
 
 /**
  * DTO for XML content config.
+ * @class
+ * @property type
  */
 function ContentConfig() {	
 	this.type;	
@@ -2744,10 +3499,13 @@ function ContentConfig() {
 	}
 }
 ContentConfig.prototype = new Config();
+ContentConfig.prototype.constructor = ContentConfig;
 ContentConfig.constructor = ContentConfig;
 
 /**
  * DTO for XML domain config.
+ * @class
+ * @property creationMode
  */
 function DomainConfig() {
 	this.creationMode;
@@ -2765,7 +3523,7 @@ function DomainConfig() {
 		if (this.creationMode != null && this.creationMode != "") {
 			xml = xml + (" creationMode=\"" + this.creationMode + "\"");
 		}
-		this.writeWebMediumXML(writer);
+		this.xml = this.writeWebMediumXML(xml);
 		xml = xml + ("</domain>");
 		return xml;
 	}
@@ -2776,10 +3534,15 @@ function DomainConfig() {
 	}
 }
 DomainConfig.prototype = new WebMediumConfig();
+DomainConfig.prototype.constructor = DomainConfig;
 DomainConfig.constructor = DomainConfig;
 
 /**
  * DTO for XML forum config.
+ * @class
+ * @property replyAccessMode
+ * @property postAccessMode
+ * @property posts
  */
 function ForumConfig() {
 	this.replyAccessMode;
@@ -2815,10 +3578,32 @@ function ForumConfig() {
 	}
 }
 ForumConfig.prototype = new WebMediumConfig();
+ForumConfig.prototype.constructor = ForumConfig;
 ForumConfig.constructor = ForumConfig;
 
 /**
  * DTO for XML forum post config.
+ * @class
+ * @property id
+ * @property topic
+ * @property summary
+ * @property details
+ * @property detailsText
+ * @property forum
+ * @property tags
+ * @property isAdmin
+ * @property isFlagged
+ * @property flaggedReason
+ * @property isFeatured
+ * @property creator
+ * @property creationDate
+ * @property views
+ * @property dailyViews
+ * @property weeklyViews
+ * @property monthlyViews
+ * @property replyCount
+ * @property parent
+ * @property replies
  */
 function ForumPostConfig() {	
 	this.id;
@@ -2936,10 +3721,18 @@ function ForumPostConfig() {
 	}
 }
 ForumPostConfig.prototype = new Config();
+ForumPostConfig.prototype.constructor = ForumPostConfig;
 ForumPostConfig.constructor = ForumPostConfig;
 
 /**
- * DTO for XML bot instance config.
+ * The Instance config object defines the settings for a bot instance.
+ * It is used to create, edit, and reference a bot.
+ * It inherits from the WebMediumConfig class.
+ * @see {@link WebMediumConfig}
+ * @class
+ * @property size
+ * @property allowForking
+ * @property template
  */
 function InstanceConfig() {
 	this.size;
@@ -2959,7 +3752,7 @@ function InstanceConfig() {
 		if (this.allowForking) {
 			xml = xml + (" allowForking=\"true\"");
 		}
-		this.writeWebMediumXML(writer);
+		xml = this.writeWebMediumXML(xml);
 		if (this.template != null) {
 			xml = xml + ("<template>");
 			xml = xml + (this.template);
@@ -2981,10 +3774,20 @@ function InstanceConfig() {
 	}
 }
 InstanceConfig.prototype = new WebMediumConfig();
+InstanceConfig.prototype.constructor = InstanceConfig;
 InstanceConfig.constructor = InstanceConfig;
 
 /**
- * DTO for XML media config.
+ * The Media config object is used the send and retrieve image, video, audio, and file attachments with the server.
+ * Media and file attachments can be sent linked in chat messages or forum posts.
+ * It inherits from the Config class.
+ * @see {@link Config}
+ * @class
+ * @property id
+ * @property name
+ * @property type
+ * @property file
+ * @property key
  */
 function MediaConfig() {
 	this.id;	
@@ -3023,13 +3826,20 @@ function MediaConfig() {
 	}
 }
 MediaConfig.prototype = new Config();
+MediaConfig.prototype.constructor = MediaConfig;
 MediaConfig.constructor = MediaConfig;
 
 /**
- * DTO for XML voice config.
+ * The Voice config object allows the bot's voice to be configured.
+ * It inherits from the Config class.
+ * @see {@link Config} Config
+ * @class
+ * @property language
+ * @property pitch
+ * @property speechRate
  */
 function VoiceConfig() {
-	this.language;	
+	this.language;
 	this.pitch;
 	this.speechRate;
 	
@@ -3059,5 +3869,60 @@ function VoiceConfig() {
 	}
 }
 VoiceConfig.prototype = new Config();
+VoiceConfig.prototype.constructor = VoiceConfig;
 VoiceConfig.constructor = VoiceConfig;
 
+/**
+ * The Training config object allows new responses to be added to the bot.
+ * It supports four operations, AddGreeting, RemoveGreeting, AddDefaultResponse, RemoveDefaultResponse, and AddResponse.
+ * It inherits from the Config class.
+ * @see {@link Config} Config
+ * @class
+ * @property operation
+ * @property pitch
+ * @property speechRate
+ */
+function TrainingConfig() {
+	this.operation;
+	this.question;
+	this.response;
+	
+	this.parseXML = function (element) {		
+		this.operation = element.getAttribute("operation");
+		var node = element.getElementsByTagName("question")[0];
+		if (node != null) {
+			this.question = SDK.innerHTML(node);
+		}
+		node = element.getElementsByTagName("response")[0];
+		if (node != null) {
+			this.response = SDK.innerHTML(node);
+		}
+	}
+	
+	this.toXML = function() {
+		var xml = "<training";
+		xml = this.writeCredentials(xml);
+
+		if (this.operation != null) {
+			xml = xml + (" operation=\"" + this.operation + "\"");
+		}
+		xml = xml + (">");
+		if (this.question != null) {
+			xml = xml + ("<question>");
+			xml = xml + (this.question);
+			xml = xml + ("</question>");
+		}
+		if (this.response != null) {
+			xml = xml + ("<response>");
+			xml = xml + (this.response);
+			xml = xml + ("</response>");
+		}
+		xml = xml + ("</training>");
+		
+		xml = xml + ("/>");
+		return xml;
+	}
+}
+TrainingConfig.prototype = new Config();
+TrainingConfig.prototype.constructor = TrainingConfig;
+TrainingConfig.constructor = TrainingConfig;

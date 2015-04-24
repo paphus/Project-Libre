@@ -13,6 +13,7 @@ import android.widget.TextView;
 import com.paphus.sdk.activity.R;
 import com.paphus.sdk.activity.actions.HttpGetImageAction;
 import com.paphus.sdk.config.WebMediumConfig;
+import com.paphus.sdk.util.Utils;
 
 public class ImageListAdapter extends ArrayAdapter<WebMediumConfig> {
 	 
@@ -48,7 +49,7 @@ public class ImageListAdapter extends ArrayAdapter<WebMediumConfig> {
         }
         
         holder.nameView.setText(config.name);
-        holder.descriptionView.setText(config.description);
+        holder.descriptionView.setText(Utils.stripTags(config.description));
         holder.statView.setText(config.stats());
         if (MainActivity.showImages) {
         	HttpGetImageAction.fetchImage(this.activity, config.avatar, holder.imageView);

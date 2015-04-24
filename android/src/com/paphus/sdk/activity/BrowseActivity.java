@@ -61,6 +61,9 @@ public class BrowseActivity extends Activity {
 	}
 	
 	public void resetLast() {
+		if (MainActivity.current == null) {
+			return;
+		}
 		Button button = (Button)findViewById(R.id.lastButton);
     	SharedPreferences cookies = MainActivity.current.getPreferences(Context.MODE_PRIVATE);
     	String last = cookies.getString("instance", null);

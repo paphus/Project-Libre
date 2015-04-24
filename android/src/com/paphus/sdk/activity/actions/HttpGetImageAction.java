@@ -15,41 +15,58 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 
 public class HttpGetImageAction extends HttpAction {
 	public static int MAX_HEIGHT = 300;
 	public static int MAX_WIDTH = 300;
+	public static int MAX_FILES = 100;
+	
+	public static volatile boolean downloading;
 	
 	static File cacheDir;	
 	static Map<String, SoftReference<Bitmap>> imageCache = new Hashtable<String, SoftReference<Bitmap>>();
 	
 	String image;
 	Bitmap bmp;
-	ImageView view;
+	View view;
 	
 	public static void clearFileCache(Context context) {
 		try {
-        File[] files= getFileCacheDir(context).listFiles();
+			File[] files = getFileCacheDir(context).listFiles();
 	        if (files == null) {
 	            return;
 	        }
 	        for (File file : files) {
-	            file.delete();
+	        	boolean success = false;
+	        	if (file.isDirectory()) {
+	        		File[] nested = file.listFiles();
+	    	        for (File nestedFile : nested) {
+	    	        	if (!nestedFile.isDirectory()) {
+	    	        		success = nestedFile.delete();
+	    	        	}
+	    	        }
+	        	} else {
+	        		success = file.delete();
+	        	}
 	        }
 		} catch (Exception failed) {
-			failed.printStackTrace();
+			Log.wtf(failed.toString(), failed);
 		}
     }
 	
     public static File getFileCacheDir(Context context) {
     	if (cacheDir == null) {
     		try {
-		        if (android.os.Environment.getExternalStorageState().equals(android.os.Environment.MEDIA_MOUNTED)) {
-		            cacheDir = new File(android.os.Environment.getExternalStorageDirectory().toString() + "/botlibre");
-		        } else {
+		        //if (android.os.Environment.getExternalStorageState().equals(android.os.Environment.MEDIA_MOUNTED)) {
+		        //    cacheDir = new File(android.os.Environment.getExternalStorageDirectory().toString() + "/botlibre");
+		        //} else {
 		            cacheDir = context.getCacheDir();
-		        }
+		        //}
 		        if (!cacheDir.exists()) {
 		            cacheDir.mkdirs();
 		        }
@@ -71,11 +88,20 @@ public class HttpGetImageAction extends HttpAction {
     	dir = new File(file.getParent());
     	if (!dir.exists()) {
     		dir.mkdir();
+    	} else {
+	        File[] files = dir.listFiles();
+	    	if (files.length > MAX_FILES) {
+    	        for (File nestedFile : files) {
+    	        	if (!nestedFile.isDirectory()) {
+    	        		nestedFile.delete();
+    	        	}
+    	        }	    		
+	    	}
     	}
     	return file;
     }
 	
-	public static void fetchImage(Activity activity, String image, ImageView view) {
+	public static void fetchImage(Activity activity, String image, View view) {
 		if (image == null) {
 			return;
 		}
@@ -83,7 +109,11 @@ public class HttpGetImageAction extends HttpAction {
 		if (ref != null) {
 			Bitmap bmp = ref.get();
 			if (bmp != null) {
-				view.setImageBitmap(bmp);
+				if (view instanceof ImageView) {
+					((ImageView)view).setImageBitmap(bmp);
+				} else if (view instanceof Button) {
+					((Button)view).setBackgroundDrawable(new BitmapDrawable(view.getResources(), bmp));					
+				}
 		        return;
 			}
 		}
@@ -102,7 +132,11 @@ public class HttpGetImageAction extends HttpAction {
     	}
 	}
 	
-	public HttpGetImageAction(Activity activity, String image, ImageView view) {
+	public HttpGetImageAction(Activity activity) {
+		super(activity);
+	}
+	
+	public HttpGetImageAction(Activity activity, String image, View view) {
 		super(activity);
 		this.image = image;
 		this.view = view;
@@ -153,6 +187,7 @@ public class HttpGetImageAction extends HttpAction {
 
 		    File file = getFile(this.image, this.activity);
 		    if (!file.exists()) {
+		    	downloading = true;
 		    	file.createNewFile();
 		    	FileOutputStream outputStream = new FileOutputStream(file);
 			    InputStream stream = url.openConnection().getInputStream();
@@ -167,11 +202,12 @@ public class HttpGetImageAction extends HttpAction {
 	            }
 	            stream.close();
 	            outputStream.close();
+		    	downloading = false;
 		    }
 
 		    BitmapFactory.Options options = new BitmapFactory.Options();
 		    options.inJustDecodeBounds = true;
-		    InputStream stream = new FileInputStream(getFile(this.image, this.activity));
+		    InputStream stream = new FileInputStream(file);
 		    BitmapFactory.decodeStream(stream, null, options);
 		    stream.close();
 
@@ -189,7 +225,7 @@ public class HttpGetImageAction extends HttpAction {
 		    options.inSampleSize = inSampleSize;
 		    options.inJustDecodeBounds = false;
 
-		    stream = new FileInputStream(getFile(this.image, this.activity));
+		    stream = new FileInputStream(file);
 		    this.bmp = BitmapFactory.decodeStream(stream, null, options);
 		    stream.close();
 			    
@@ -204,6 +240,10 @@ public class HttpGetImageAction extends HttpAction {
 	}
 
 	protected void postExecute() {
-        this.view.setImageBitmap(this.bmp);
+		if (view instanceof ImageView) {
+			((ImageView)view).setImageBitmap(bmp);
+		} else if (view instanceof Button) {
+			((Button)view).setBackgroundDrawable(new BitmapDrawable(view.getResources(), bmp));					
+		}
 	}
 }

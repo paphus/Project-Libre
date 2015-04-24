@@ -74,21 +74,21 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" >
 
-            <TextView
+            <WebView
                 android:id="@+id/descriptionLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="description"
                 android:textAppearance="?android:attr/textAppearanceSmall" />
 
-            <TextView
+            <WebView
                 android:id="@+id/detailsLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="details"
                 android:textSize="10sp" />
 
-            <TextView
+            <WebView
                 android:id="@+id/disclaimerLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

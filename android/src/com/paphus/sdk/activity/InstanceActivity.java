@@ -23,6 +23,10 @@ public class InstanceActivity extends WebMediumActivity {
 
         super.resetView();
 
+        if (instance.isExternal) {
+        	findViewById(R.id.chatButton).setVisibility(View.GONE);
+        }
+        
     	TextView text = (TextView) findViewById(R.id.sizeLabel);
         if (instance.size != null && instance.size.length() > 0) {
 	        text.setText(instance.size + " neurons");

@@ -4,6 +4,8 @@ import java.util.List;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ListView;
 
@@ -32,6 +34,29 @@ public class ChoosePostActivity extends Activity {
 
 		ListView list = (ListView) findViewById(R.id.instancesList);
 		list.setAdapter(new ForumPostImageListAdapter(this, R.layout.forumpost_list, this.instances));
+		GestureDetector.SimpleOnGestureListener listener = new GestureDetector.SimpleOnGestureListener() {
+			@Override
+			public boolean onDoubleTapEvent(MotionEvent event) {
+				if (event.getAction() == MotionEvent.ACTION_UP) {
+					ListView list = (ListView) findViewById(R.id.instancesList);
+			        int index = list.getCheckedItemPosition();
+			        if (index < 0) {
+						return false;
+			        } else {
+			        	selectInstance(list);
+			        }
+					return true;
+				}
+				return false;
+			}
+		};
+		final GestureDetector listDetector = new GestureDetector(this, listener);
+		list.setOnTouchListener(new View.OnTouchListener() {			
+			@Override
+			public boolean onTouch(View v, MotionEvent event) {
+				return listDetector.onTouchEvent(event);
+			}
+		});
 	}
 	
 	@Override

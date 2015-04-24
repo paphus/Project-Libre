@@ -1,6 +1,8 @@
 package com.paphus.sdk.activity.forum;
 
+import android.os.Bundle;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ListView;
 
 import com.paphus.sdk.activity.R;
@@ -15,6 +17,12 @@ import com.paphus.sdk.config.ForumConfig;
  */
 public class ChooseForumActivity extends ChooseBotActivity {
 
+	@Override
+	public void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		((Button)findViewById(R.id.chatButton)).setText("Posts");
+	}
+	
 	public void selectInstance(View view) {
         ListView list = (ListView) findViewById(R.id.instancesList);
         int index = list.getCheckedItemPosition();
@@ -27,6 +35,22 @@ public class ChooseForumActivity extends ChooseBotActivity {
         config.id = this.instance.id;
 		
         HttpAction action = new HttpFetchAction(this, config);
+    	action.execute();
+	}
+
+	public void chat(View view) {
+        ListView list = (ListView) findViewById(R.id.instancesList);
+        int index = list.getCheckedItemPosition();
+        if (index < 0) {
+        	MainActivity.showMessage("Select a forum", this);
+        	return;
+        }
+        this.instance = instances.get(index);
+        ForumConfig config = new ForumConfig();
+        config.id = this.instance.id;
+        config.name = this.instance.name;
+		
+        HttpAction action = new HttpFetchAction(this, config, true);
     	action.execute();
 	}
 }

@@ -48,6 +48,7 @@ import com.paphus.sdk.config.MediaConfig;
 import com.paphus.sdk.config.UserConfig;
 import com.paphus.sdk.config.VoiceConfig;
 import com.paphus.sdk.config.WebMediumConfig;
+import com.paphus.sdk.util.Utils;
 
 /**
  * Activity for live chat and chatrooms.
@@ -64,6 +65,7 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
     protected MediaPlayer chimePlayer;
     protected String childActivity = "";
     protected long startTime;
+    protected boolean closing;
     
     public String html = "";
 	
@@ -335,8 +337,8 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
      * Clear the log.
      */
     public void clear(View view) {
-    	TextView log = (TextView) findViewById(R.id.logText);
-		log.setText("");
+    	WebView log = (WebView) findViewById(R.id.logText);
+		log.loadDataWithBaseURL(null, "", "text/html", "utf-8", null);
     }
 
 	public void menu(View view) {
@@ -380,7 +382,8 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 	}
  
     @Override
-    public void onDestroy() {    	
+    public void onDestroy() {
+    	this.closing = true;
 		if (this.connection != null) {
 			try {
 				this.connection.disconnect();
@@ -391,6 +394,10 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
         	this.tts.stop();
         	this.tts.shutdown();
         }
+		if (this.chimePlayer != null) {
+			this.chimePlayer.stop();
+			this.chimePlayer.release();
+		}
         super.onDestroy();
     }
  
@@ -458,12 +465,15 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
     
     public void clearLog() {
     	this.html = "";
-    	
+
     	WebView log = (WebView) findViewById(R.id.logText);
 		log.loadDataWithBaseURL(null, "", "text/html", "utf-8", null);
     }
     
     public void response(String text) {
+    	if (this.closing) {
+    		return;
+    	}
     	String user = "";
     	String message = text;
     	int index = text.indexOf(':');
@@ -478,10 +488,10 @@ public class LiveChatActivity extends Activity implements TextToSpeech.OnInitLis
 		}
 		
 		WebView responseView = (WebView) findViewById(R.id.responseText);
-		responseView.loadDataWithBaseURL(null, MainActivity.linkHTML(text), "text/html", "utf-8", null);
-		    	
+		responseView.loadDataWithBaseURL(null, Utils.linkHTML(text), "text/html", "utf-8", null);
+
 		WebView log = (WebView) findViewById(R.id.logText);
-		this.html = this.html + "<b>" + user + "</b><br/>"  + MainActivity.linkHTML(message) + "<br/>";
+		this.html = this.html + "<b>" + user + "</b><br/>"  + Utils.linkHTML(message) + "<br/>";
 		log.loadDataWithBaseURL(null, this.html, "text/html", "utf-8", null);
 		
 		final ScrollView scroll = (ScrollView) findViewById(R.id.scrollView);

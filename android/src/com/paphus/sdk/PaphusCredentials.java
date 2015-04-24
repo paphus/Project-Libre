@@ -25,7 +25,7 @@ package com.paphus.sdk;
  */
 public class PaphusCredentials extends Credentials {
 	public static String DOMAIN = "www.paphuslivechat.com";
-	//public static String DOMAIN = "192.168.0.12:9080";
+	//public static String DOMAIN = "192.168.0.11:9080";
 	public static String APP = "";
 	//public static String APP = "/livechat";
 	public static String PATH = "/rest/livechat";

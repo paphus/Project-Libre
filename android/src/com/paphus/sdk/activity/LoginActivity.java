@@ -1,6 +1,7 @@
 package com.paphus.sdk.activity;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.EditText;
@@ -35,4 +36,11 @@ public class LoginActivity extends Activity {
         HttpConnectAction action = new HttpConnectAction(this, config, true);
     	action.execute();
     }
+	
+	public void signUp(View view) {
+		finish();
+		
+        Intent intent = new Intent(this, CreateUserActivity.class);
+        startActivity(intent);
+	}
 }

@@ -3,8 +3,13 @@ package com.paphus.sdk.activity;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -51,13 +56,50 @@ public abstract class WebMediumActivity extends Activity {
 	        findViewById(R.id.imageView).setVisibility(View.GONE);        	
         }
         
-        TextView text = (TextView) findViewById(R.id.descriptionLabel);
-        text.setText(instance.description);
-        text = (TextView) findViewById(R.id.detailsLabel);
-        text.setText(instance.details);
-        text = (TextView) findViewById(R.id.disclaimerLabel);
-        text.setText(instance.disclaimer);
-        text = (TextView) findViewById(R.id.categoriesLabel);
+        TextView textView = (TextView) findViewById(R.id.websiteLabel);
+        textView.setText(instance.website);
+        
+        WebView web = (WebView) findViewById(R.id.descriptionLabel);
+        web.loadDataWithBaseURL(null, instance.description, "text/html", "utf-8", null);        
+        web.setWebViewClient(new WebViewClient() {
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            	try {
+            		view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            	} catch (Exception failed) {
+            		return false;
+            	}
+                return true;
+            }
+        });
+        web = (WebView) findViewById(R.id.detailsLabel);
+        WebSettings webSettings = web.getSettings();
+        webSettings.setDefaultFontSize(10);
+        web.loadDataWithBaseURL(null, instance.details, "text/html", "utf-8", null);        
+        web.setWebViewClient(new WebViewClient() {
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            	try {
+            		view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            	} catch (Exception failed) {
+            		return false;
+            	}
+                return true;
+            }
+        });
+        web = (WebView) findViewById(R.id.disclaimerLabel);
+        webSettings = web.getSettings();
+        webSettings.setDefaultFontSize(10);
+        web.loadDataWithBaseURL(null, instance.disclaimer, "text/html", "utf-8", null);        
+        web.setWebViewClient(new WebViewClient() {
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            	try {
+            		view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            	} catch (Exception failed) {
+            		return false;
+            	}
+                return true;
+            }
+        });
+        TextView text = (TextView) findViewById(R.id.categoriesLabel);
         if (text != null) {
 	        text.setText(instance.categories);
         }

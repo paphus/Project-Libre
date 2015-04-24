@@ -2,11 +2,14 @@ package com.paphus.sdk.activity;
 
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -36,7 +39,7 @@ public class ViewUserActivity extends CreateUserActivity {
         	return;
         }
         
-        setTitle(user.name);
+        setTitle(user.user);
         
         TextView text = (TextView) findViewById(R.id.userText);
         text.setText(user.user);
@@ -68,8 +71,18 @@ public class ViewUserActivity extends CreateUserActivity {
         text.setText(user.posts);
         text = (TextView) findViewById(R.id.messagesText);
         text.setText(user.messages);
-        text = (TextView) findViewById(R.id.bioText);
-        text.setText(user.bio);
+        WebView web = (WebView) findViewById(R.id.bioText);
+        web.loadDataWithBaseURL(null, user.bio, "text/html", "utf-8", null);        
+        web.setWebViewClient(new WebViewClient() {
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            	try {
+            		view.getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            	} catch (Exception failed) {
+            		return false;
+            	}
+                return true;
+            }
+        });
         
         HttpGetImageAction.fetchImage(this, MainActivity.viewUser.avatar, (ImageView)findViewById(R.id.imageView));
 	}
@@ -93,6 +106,7 @@ public class ViewUserActivity extends CreateUserActivity {
         }
         if (MainActivity.user != MainActivity.viewUser) {
     	    menu.findItem(R.id.menuChangeIcon).setEnabled(false);
+    	    menu.findItem(R.id.menuEditUser).setEnabled(false);
         }
 	    return true;
 	}
@@ -106,6 +120,9 @@ public class ViewUserActivity extends CreateUserActivity {
 	    case R.id.menuChangeIcon:
 	    	changeIcon();
 	        return true;
+	    case R.id.menuEditUser:
+	    	editUser();
+	        return true;
 	    case R.id.menuFlag:
 	    	flag();
 	        return true;
@@ -113,6 +130,11 @@ public class ViewUserActivity extends CreateUserActivity {
             return super.onOptionsItemSelected(item);
         }
     }
+
+	public void editUser() {
+        Intent intent = new Intent(this, EditUserActivity.class);
+        startActivity(intent);
+	}
 
 	public void flag() {
         if (MainActivity.user == null) {

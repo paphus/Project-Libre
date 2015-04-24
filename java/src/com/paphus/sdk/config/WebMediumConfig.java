@@ -18,9 +18,13 @@ public abstract class WebMediumConfig extends Config {
 	public boolean isHidden;
 	public String accessMode;
 	public boolean isFlagged;
+	public boolean isExternal;
+	public boolean isPaphus;
+	public boolean showAds = true;
 	public String description;
 	public String details;
 	public String disclaimer;
+	public String website;
 	public String tags;
 	public String categories;
 	public String flaggedReason;
@@ -85,6 +89,12 @@ public abstract class WebMediumConfig extends Config {
 		if (this.isFlagged) {
 			writer.write(" isFlagged=\"true\"");
 		}
+		if (this.isExternal) {
+			writer.write(" isExternal=\"true\"");
+		}
+		if (this.showAds) {
+			writer.write(" showAds=\"true\"");
+		}
 		writer.write(">");
 		if (this.description != null) {
 			writer.write("<description>");
@@ -116,6 +126,11 @@ public abstract class WebMediumConfig extends Config {
 			writer.write(this.license);
 			writer.write("</license>");
 		}
+		if (this.website != null) {
+			writer.write("<website>");
+			writer.write(this.website);
+			writer.write("</website>");
+		}
 		if (this.flaggedReason != null) {
 			writer.write("<flaggedReason>");
 			writer.write(this.flaggedReason);
@@ -133,11 +148,13 @@ public abstract class WebMediumConfig extends Config {
 		this.isAdmin = Boolean.valueOf(element.getAttribute("isAdmin"));
 		this.isAdult = Boolean.valueOf(element.getAttribute("isAdult"));
 		this.isFlagged = Boolean.valueOf(element.getAttribute("isFlagged"));
+		this.isExternal = Boolean.valueOf(element.getAttribute("isExternal"));
 		this.creator = element.getAttribute("creator");
 		this.creationDate = element.getAttribute("creationDate");
 		this.connects = element.getAttribute("connects");
 		this.dailyConnects = element.getAttribute("dailyConnects");
 		this.weeklyConnects = element.getAttribute("weeklyConnects");
+		this.showAds = Boolean.valueOf(element.getAttribute("showAds"));
 		this.monthlyConnects = element.getAttribute("monthlyConnects");
 		
 		Node node = element.getElementsByTagName("description").item(0);

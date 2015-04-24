@@ -25,7 +25,10 @@ public class ChatResponse extends Config {
 	public String avatarAudioType;
 	public String avatarBackground;
 	public String speech;
-
+	
+	public boolean isVideo() {
+		return this.avatarType != null && this.avatarType.indexOf("video") != -1;
+	}
 
 	public void parseXML(Element element) {
 		this.conversation = element.getAttribute("conversation");

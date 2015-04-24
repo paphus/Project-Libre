@@ -58,7 +58,7 @@ public class HttpFetchAction extends HttpUIAction {
         	cookies.commit();
 
         	Class childActivity = null;
-        	if (this.launch) {
+        	if (this.launch && !this.config.isExternal) {
 	        	if (this.config instanceof ChannelConfig) {
 	        		childActivity = LiveChatActivity.class;
 	        	} else if (this.config instanceof ForumConfig) {
@@ -78,7 +78,14 @@ public class HttpFetchAction extends HttpUIAction {
 	    			MainActivity.forumCategories = null;
 	    			MainActivity.channelTags = null;
 	    			MainActivity.channelCategories = null;
-	        	}        		
+
+	    			MainActivity.type = MainActivity.defaultType;	    			
+	    	        Intent intent = new Intent(this.activity, MainActivity.class);
+	    			intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+	    			intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+	    			this.activity.startActivity(intent);
+	    			return;
+	        	}
         	} else {
 	        	if (this.config instanceof ChannelConfig) {
 	        		childActivity = ChannelActivity.class;

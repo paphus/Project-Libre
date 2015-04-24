@@ -36,6 +36,11 @@ public class ForumActivity extends WebMediumActivity {
 
         super.resetView();
 
+        if (instance.isExternal) {
+        	findViewById(R.id.newPostButton).setVisibility(View.GONE);
+        	findViewById(R.id.postsButton).setVisibility(View.GONE);
+        }
+
     	TextView text = (TextView) findViewById(R.id.postsLabel);
         if (instance.posts != null && instance.posts.length() > 0) {
 	        text.setText(instance.posts + " posts");

@@ -4,6 +4,9 @@
     <item android:id="@+id/menuChangeIcon"
           android:title="Change Icon" />
     
+    <item android:id="@+id/menuEditUser"
+          android:title="Edit User" />
+    
     <item android:id="@+id/menuFlag"
           android:title="Flag User" />    
      
