@@ -1,7 +1,7 @@
 Project-Libre
 =============
 
-Project Libre is an open client platform for web and mobile services. Project Libre includes an API, SDK, and user interface for live chat, chatrooms, forums, chat bots, and other services supported by the libre and Paphus servers.
+Project Libre is an open platform for chat bots, virtual agents, live chat, and more. It includes web and mobile services for Java, Android, iOS, and JavaScript. Project Libre includes an API, SDK, and user interface for live chat, chatrooms, forums, chat bots, virtual agents, and other services supported by the Bot Libre and Paphus servers.
 
 The hosted servers include:
 
