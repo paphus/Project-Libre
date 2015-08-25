@@ -9,3 +9,5 @@ The hosted servers include:
 * FORUMs libre! - http://www.forumslibre.com - free embeddable forums
 * LIVE CHAT libre! - http://www.livechatlibre.com - free live chat and chatrooms
 * Paphus Live Chat - http://www.paphuslivechat.com - commercial live chat, chatroom, forums, and chat bot hosting service
+
+Interested in joining the project? Email projectlibre@botlibre.com
