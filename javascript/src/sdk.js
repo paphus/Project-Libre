@@ -33,7 +33,7 @@
  * This is used for chat bots, forums, user admin, and domains.
  * 
  * LiveChatConnection uses web sockets to provide access to live chat and chatrooms.
- * Version: 2.5.1-2015-04-15
+ * Version: 2.7.8-2015-08-10
  */
 
 /**
@@ -62,8 +62,23 @@ SDK.rest = SDK.url + SDK.PATH;
  */
 SDK.applicationId = null;
 
-/** @static */
+/**
+ * Enable debug logging.
+ * @static
+ */
 SDK.debug = false;
+
+/**
+ * Force avatars to use canvas for video (currently used only for Chrome and Firefox).
+ * @static
+ */
+SDK.useCanvas = null;
+
+/**
+ * Attempt to fix grey mp4 video background (only used for Chrome).
+ * @static
+ */
+SDK.fixBrightness = null;
 
 /**
  * Set the error static field to trap or log any errors.
@@ -76,6 +91,7 @@ SDK.currentAudio = null;
 SDK.recognition = null;
 SDK.recognitionActive = false;
 SDK.backgroundAudio = null;
+SDK.timers = {};
 
 /**
  * Play the audio file given the url.
@@ -121,32 +137,105 @@ SDK.chime = function() {
 }
 
 /**
- * Convert the text to speech and play it as an audio file.
+ * Convert the text to speech and play it either using the browser native TTS support, or as server generated an audio file.
  * The voice is optional and can be any voice supported by the server (see the voice page for a list of voices).
+ * For native voices a language code can be given.
+ * If the browser supports TTS the native voice will be used by default.
  */
-SDK.tts = function(text, voice) {
+SDK.tts = function(text, voice, native, lang, nativeVoice) {
 	try {
-		var url = SDK.rest + '/form-speak?&text=';
-		url = url + encodeURIComponent(text);
-		if (voice != null) {
-			url = url + '&voice=' + voice;
-		}
-
-		var request = new XMLHttpRequest();
-		var self = this;
-		request.onreadystatechange = function() {
-			if (request.readyState != 4) return;
-			if (request.status != 200) {
-				console.log('Error: Speech web request failed');
-				return;
+		if ((native || (native == null && voice == null)) && ('speechSynthesis' in window)) {
+			var utterance = new SpeechSynthesisUtterance(text);
+			SDK.nativeTTS(utterance, lang, nativeVoice);
+		} else {		
+			var url = SDK.rest + '/form-speak?&text=';
+			url = url + encodeURIComponent(text);
+			if (voice != null) {
+				url = url + '&voice=' + voice;
 			}
-			self.play(SDK.url + "/" + request.responseText);
+	
+			var request = new XMLHttpRequest();
+			var self = this;
+			request.onreadystatechange = function() {
+				if (request.readyState != 4) return;
+				if (request.status != 200) {
+					console.log('Error: Speech web request failed');
+					return;
+				}
+				self.play(SDK.url + "/" + request.responseText);
+			}
+			
+			request.open('GET', url, true);
+			request.send();
 		}
-		
-		request.open('GET', url, true);
-		request.send();
 	} catch (error) {
 		console.log('Error: Speech web request failed');
+	}
+}
+
+/**
+ * Speak the native utterance first setting the voice and language.
+ */
+SDK.nativeTTS = function(utterance, lang, voice) {
+	speechSynthesis.cancel();
+	if (lang == null && voice == null) {
+		// Events don't always get fired unless this is done...
+		setTimeout(function() {
+			speechSynthesis.speak(utterance);
+		},100);
+		return;
+	}
+	var voices = speechSynthesis.getVoices();
+	var foundVoice = null;
+	var foundLang = null;
+	var spoken = false;
+	if (voices.length == 0) {
+		speechSynthesis.onvoiceschanged = function() {
+			if (spoken) {
+				return;
+			}
+			voices = speechSynthesis.getVoices();
+	    	for (i = 0; i < voices.length; i++) {
+	    		if (voice != null && (voice.length != 0) && voices[i].name.toLowerCase().indexOf(voice.toLowerCase()) != -1) {
+	    			if (foundVoice == null || voices[i].name == voice) {
+		    			foundVoice = voices[i];	    				
+	    			}
+	    		} else if (lang != null && (lang.length != 0) && voices[i].lang.toLowerCase().indexOf(lang.toLowerCase()) != -1) {
+	    			if (foundLang == null || voices[i].lang == lang) {
+	    				foundLang = voices[i];	    				
+	    			}
+	    		}
+	    	}
+	    	if (foundVoice != null) {
+	    		utterance.voice = foundVoice;
+	    	} else if (foundLang != null) {
+	    		utterance.voice = foundLang;	    		
+	    	}
+	    	spoken = true;
+			setTimeout(function() {
+				speechSynthesis.speak(utterance);
+			},100);
+	    };
+	} else {
+    	for (i = 0; i < voices.length; i++) {
+    		if (voice != null && (voice.length != 0) && voices[i].name.toLowerCase().indexOf(voice.toLowerCase()) != -1) {
+    			if (foundVoice == null || voices[i].name == voice) {
+	    			foundVoice = voices[i];	    				
+    			}
+    		} else if (lang != null && (lang.length != 0) && voices[i].lang.toLowerCase().indexOf(lang.toLowerCase()) != -1) {
+    			if (foundLang == null || voices[i].lang == lang) {
+    				foundLang = voices[i];	    				
+    			}
+    		}
+    	}
+    	if (foundVoice != null) {
+    		utterance.voice = foundVoice;
+    	} else if (foundLang != null) {
+    		utterance.voice = foundLang;	    		
+    	}
+		setTimeout(function() {
+			speechSynthesis.speak(utterance);
+		},100);
 	}
 }
 
@@ -162,6 +251,23 @@ SDK.isChrome = function() {
  */
 SDK.isFirefox = function() {
 	return navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+}
+
+/**
+ * Detect mobile browser.
+ */
+SDK.isMobile = function() {
+	if (navigator.userAgent.match(/Android/i)
+		 || navigator.userAgent.match(/webOS/i)
+		 || navigator.userAgent.match(/iPhone/i)
+		 || navigator.userAgent.match(/iPad/i)
+		 || navigator.userAgent.match(/iPod/i)
+		 || navigator.userAgent.match(/BlackBerry/i)
+		 || navigator.userAgent.match(/Windows Phone/i)) {
+		return true;
+	} else {
+		return false;
+	}
 }
 
 /**
@@ -201,6 +307,24 @@ SDK.innerHTML = function(element) {
 	return html;
 }
 
+/**
+ * Strip HTML tags from text.
+ * Return plain text.
+ */
+SDK.stripTags = function(html) {
+	var element = document.createElement("p");
+	element.innerHTML = html;
+	return element.innerText || element.textContent;
+}
+
+SDK.escapeHTML = function(html) {
+	return html.replace(/&/g, "&amp;")
+    	.replace(/</g, "&lt;")
+    	.replace(/>/g, "&gt;")
+    	.replace(/"/g, "&quot;")
+    	.replace(/'/g, "&#039;");
+}
+
 SDK.linkURLs = function(text) {
 	var http = text.indexOf("http") != -1;
 	var www = text.indexOf("www.") != -1;
@@ -214,12 +338,12 @@ SDK.linkURLs = function(text) {
 	if (http) {
 	    var regex = /\b(?:https?|ftp|file):\/\/[a-z0-9-+&@#\/%?=~_|!:,.;]*[a-z0-9-+&@#\/%=~_|]/gim;
 	    text = text.replace(regex, function(url, b, c) {
-	    	url = url.toLowerCase();
-	    	if (url.indexOf(".png") != -1 || url.indexOf(".jpg") != -1 || url.indexOf(".jpeg") != -1 || url.indexOf(".gif") != -1) {
+	    	var lower = url.toLowerCase();
+	    	if (lower.indexOf(".png") != -1 || lower.indexOf(".jpg") != -1 || lower.indexOf(".jpeg") != -1 || lower.indexOf(".gif") != -1) {
 	    		return '<a href="' + url + '" target="_blank"><img src="' + url + '" height="50"></a>';
-	    	} else if (url.indexOf(".mp4") != -1 || url.indexOf(".webm") != -1 || url.indexOf(".ogg") != -1) {
+	    	} else if (lower.indexOf(".mp4") != -1 || lower.indexOf(".webm") != -1 || lower.indexOf(".ogg") != -1) {
 	    		return '<a href="' + url + '" target="_blank"><video src="' + url + '" height="50"></a>';
-	    	} else if (url.indexOf(".wav") != -1 || url.indexOf(".mp3") != -1) {
+	    	} else if (lower.indexOf(".wav") != -1 || lower.indexOf(".mp3") != -1) {
 	    		return '<a href="' + url + '" target="_blank"><audio src="' + url + '" controls>audio</a>';
 	    	} else {
 	    		return '<a href="' + url + '" target="_blank">' + url + '</a>';
@@ -268,21 +392,6 @@ SDK.registerSpeechRecognition = function(input, button) {
 		} else {
 			return;
 		}
-		/*if ('speechSynthesis' in window) {
-			console.log('speechSynthesis');
-			console.log(speechSynthesis.getVoices());
-		    speechSynthesis.speak(new SpeechSynthesisUtterance('Hello World'));
-		    speechSynthesis.onvoiceschanged = function() {
-	    		console.log(speechSynthesis.getVoices());
-	    		var voices = speechSynthesis.getVoices();
-		    	for (i = 0; i < voices.length; i++) {
-		    		console.log(voices[i].name);
-		    		var msg = new SpeechSynthesisUtterance('Hello World 1 2 3');
-		    		msg.voice = voices[i];
-				    speechSynthesis.speak(msg);		    		
-		    	}
-		    };
-		}*/
 	}
 }
 
@@ -483,6 +592,9 @@ function WebLiveChatListener() {
 	this.playChime = true;
 	this.speak = false;
 	this.voice = null;
+	this.nativeVoice = null;
+	this.nativeVoiceName = null;
+	this.lang = null;
 	this.nick = "";
 	this.connection = null;
 	this.sdk = null;
@@ -506,7 +618,7 @@ function WebLiveChatListener() {
 				SDK.chime();
 			}
 			if (this.speak) {
-				SDK.tts(responseText, this.voice);
+				SDK.tts(SDK.stripTags(responseText), this.voice, this.nativeVoice, this.lang, this.nativeVoiceName);
 			}
 		}
 		document.getElementById('response').innerHTML = SDK.linkURLs(message);
@@ -819,11 +931,12 @@ function WebLiveChatListener() {
 /**
  * Shared method for updating an avatar image/video/audio from the chat response.
  */
-SDK.updateAvatar = function(responseMessage, speak, urlprefix, elementPrefix, channelaudio, afterFunction) {
+SDK.updateAvatar = function(responseMessage, speak, urlprefix, elementPrefix, channelaudio, afterFunction, nativeVoice, lang, voice) {
+	nativeVoice = nativeVoice && ('speechSynthesis' in window);
 	if (elementPrefix == null) {
 		elementPrefix = "";
 	}
-	var avatarStatus = document.getElementById(elementPrefix + "avatar-status");
+	var avatarStatus = document.getElementById(this.elementPrefix + "avatar-status");
 	if (avatarStatus != null) {
 		var status = "";
 		if (responseMessage.emote != null && responseMessage.emote != "" && responseMessage.emote != "NONE") {
@@ -861,22 +974,75 @@ SDK.updateAvatar = function(responseMessage, speak, urlprefix, elementPrefix, ch
 			div.style.display = "none";
 		}
 		div = document.getElementById(elementPrefix + "avatar-video-div");
+		var canvas = null;
 		if (div != null) {
 			div.style.display = "inline-block";
 			if (responseMessage.avatarBackground != null) {
 				div.style.backgroundImage = "url(" + urlprefix + responseMessage.avatarBackground + ")";
 			}
+			var canvasDiv = document.getElementById(elementPrefix + "avatar-canvas-div");
+			if (((SDK.isChrome() && !SDK.isMobile()) || SDK.isFirefox() || SDK.useCanvas == true) && SDK.useCanvas != false && canvasDiv != null) {
+				div.style.position = "fixed";
+				div.style.top = "-1000";
+				div.style.left = "-1000";
+				div.style.opacity = "0";
+				div.style.zIndex = "-1";
+				canvasDiv.style.display = "inline-block";
+				canvas = document.getElementById(elementPrefix + "avatar-canvas");
+			}
 		}
 		var video = document.getElementById(elementPrefix + "avatar-video");
 		if (video == null) {
 			if (speak) {
-				var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
-				audio.onended = afterFunction;
+				if (nativeVoice) {
+					SDK.tts(SDK.stripTags(responseMessage.message), null, true, lang, voice);
+				} else {
+					var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
+					audio.onended = afterFunction;
+				}
 			}
 			return;
 		} else {
-			if (responseMessage.avatarBackground != null) {
-				video.poster = urlprefix + responseMessage.avatarBackground;				
+			if (responseMessage.avatar.indexOf("mp4") != -1 && (SDK.isChrome() || SDK.isFirefox() || SDK.fixBrightness != true) && SDK.fixBrightness != false) {
+				// Hack to fix grey background in Chrome.
+				if (SDK.isChrome()) {
+					video.style.webkitFilter = "brightness(108.5%)";
+				} else {
+					video.style["filter"] = "brightness(1.085)";
+				}
+				if (canvas != null) {
+					if (SDK.isChrome()) {
+						canvas.style.webkitFilter = "brightness(108.5%)";
+					} else {
+						video.style["filter"] = "brightness(1.085)";
+					}
+				}
+			}
+			if (canvas == null) {
+				if (responseMessage.avatarBackground != null) {
+					video.poster = urlprefix + responseMessage.avatarBackground;				
+				}
+			}
+		}
+		var context = null;
+		var drawCanvas = null;
+		if (canvas != null) {
+		    context = canvas.getContext('2d');
+			if (SDK.timers[elementPrefix + "avatar-canvas"] == null) {
+				drawCanvas = function() {
+				    if (!video.paused && !video.ended && video.currentTime > 0) {
+				    	if (canvas.width != video.offsetWidth) {
+				    		canvas.width = video.offsetWidth;
+				    	}
+				    	if (canvas.height != video.offsetHeight) {
+				    		canvas.height = video.offsetHeight;
+				    	}
+				    	context.clearRect(0, 0, canvas.width, canvas.height);
+				    	context.drawImage(video, 0, 0, video.offsetWidth, video.offsetHeight);
+				    }
+				}
+				SDK.timers[elementPrefix + "avatar-canvas"] = drawCanvas;
+				setInterval(drawCanvas, 20);				
 			}
 		}
 		var end = function() {
@@ -890,34 +1056,76 @@ SDK.updateAvatar = function(responseMessage, speak, urlprefix, elementPrefix, ch
 		var talk = function() {
 			if (responseMessage.avatarTalk != null) {
 				if (speak) {
-					if (responseMessage.speech == null) {
+					if (responseMessage.speech == null && !nativeVoice) {
 						end();
 					} else {
 						video.src = urlprefix + responseMessage.avatar;
 						video.loop = true;
-						//var audio = new Audio(urlprefix + responseMessage.speech, channelaudio);
-						var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
-						//audio.onabort = function() {console.log("abort");}
-						audio.oncanplay = function() {
-							video.src = urlprefix + responseMessage.avatarTalk;
-							video.loop = true;
+						var playing = false;
+						video.play();
+
+						if (nativeVoice) {
+							var utterance = new SpeechSynthesisUtterance(SDK.stripTags(responseMessage.message));
+							utterance.onstart = function() {
+								if (playing) {
+									return false;
+								}
+								speechSynthesis.pause();
+								video.src = urlprefix + responseMessage.avatarTalk;
+								video.loop = true;
+								video.oncanplay = function() {
+									if (playing) {
+										return false;
+									}
+									playing = true;
+									speechSynthesis.resume();
+								}
+								video.play();
+							}
+							utterance.onerror = function() {
+								console.log("error");
+								end();
+							}
+							utterance.onend = function() {
+								end();
+							}
+							SDK.nativeTTS(utterance, lang, voice);
+						} else {
+							//var audio = new Audio(urlprefix + responseMessage.speech, channelaudio);
+							var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
+							//audio.onabort = function() {console.log("abort");}
+							audio.oncanplay = function() {
+								if (playing) {
+									return false;
+								}
+								audio.pause();
+								video.src = urlprefix + responseMessage.avatarTalk;
+								video.loop = true;
+								video.oncanplay = function() {
+									if (playing) {
+										return false;
+									}
+									playing = true;
+									audio.play();
+								}
+								video.play();
+							}
+							audio.onerror = function() {
+								console.log("error");
+								end();
+							}
+							//audio.onloadeddata = function() {console.log("loadeddata");}
+							//audio.onloadedmetadata = function() {console.log("loadedmetadata");}
+							//audio.onpause = function() {console.log("pause");}
+							//audio.onplay = function() {console.log("play");}
+							//audio.onplaying = function() {console.log("playing");}
+							//audio.ontimeupdate = function() {console.log("timeupdate");}
+							audio.onended = function() {
+								end();
+							}
+							audio.play();
 							video.play();
 						}
-						audio.onerror = function() {
-							console.log("error");
-							end();
-						}
-						//audio.onloadeddata = function() {console.log("loadeddata");}
-						//audio.onloadedmetadata = function() {console.log("loadedmetadata");}
-						//audio.onpause = function() {console.log("pause");}
-						//audio.onplay = function() {console.log("play");}
-						//audio.onplaying = function() {console.log("playing");}
-						//audio.ontimeupdate = function() {console.log("timeupdate");}
-						audio.onended = function() {
-							end();
-						}
-						audio.play();
-						video.play();
 					}
 				} else {
 					video.src = urlprefix + responseMessage.avatarTalk;
@@ -932,8 +1140,14 @@ SDK.updateAvatar = function(responseMessage, speak, urlprefix, elementPrefix, ch
 				video.loop = true;
 				video.play();
 				if (speak) {
-					var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
-					audio.onended = afterFunction;
+					if (nativeVoice) {
+						var utterance = new SpeechSynthesisUtterance(SDK.stripTags(responseMessage.message));
+						utterance.onend = afterFunction;
+						SDK.nativeTTS(utterance, lang, voice);
+					} else {
+						var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
+						audio.onended = afterFunction;						
+					}
 				} else if (afterFunction != null) {
 					afterFunction();			
 				}
@@ -955,6 +1169,10 @@ SDK.updateAvatar = function(responseMessage, speak, urlprefix, elementPrefix, ch
 		if (div != null) {
 			div.style.display = "none";
 		}
+		div = document.getElementById(elementPrefix + "avatar-canvas-div");
+		if (div != null) {
+			div.style.display = "none";
+		}
 		div = document.getElementById(elementPrefix + "avatar-image-div");
 		if (div != null) {
 			div.style.display = "inline-block";
@@ -968,8 +1186,12 @@ SDK.updateAvatar = function(responseMessage, speak, urlprefix, elementPrefix, ch
 			img.src = urlprefix + responseMessage.avatar;
 		}
 		if (speak) {
-			var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
-			audio.onended = afterFunction;
+			if (nativeVoice) {
+				SDK.tts(SDK.stripTags(responseMessage.message), null, true, lang, voice);
+			} else {
+				var audio = SDK.play(urlprefix + responseMessage.speech, channelaudio);
+				audio.onended = afterFunction;
+			}
 		} else if (afterFunction != null) {
 			afterFunction();			
 		}
@@ -1003,6 +1225,12 @@ function WebChatbotListener() {
 	this.allowSpeech = true;
 	/** Enable or disable speech. */
 	this.speak = true;
+	/** Configure if the browser's native voice TTS should be used. */
+	this.nativeVoice = false;
+	/** Set the voice name for the native voice. */
+	this.nativeVoiceName = null;
+	/** Set the language for the native voice. */
+	this.lang = null;
 	/** Enable or disable avatar. */
 	this.avatar = true;
 	/** A SDK connection must be set, be sure to include your app id. */
@@ -1029,10 +1257,23 @@ function WebChatbotListener() {
 	this.focus = true;
 	/** Override the URL used in the chat bot box popup. */
 	this.popupURL = null;
+	/** Print response in chat bubble. */
+	this.bubble = false;
+	/** Initial message to display. */
+	this.greeting = "loading...";
+	/** Element id prefix. This allows an id prefix to avoid name collisions on the element names for the chat, response, console, and avatar elements.*/
+	this.elementPrefix = "";
+	/** Allows the bot's thumbnail image to be set for chat log. */
+	this.botThumb;
+	/** Allows the user's thumbnail image to be set for chat log. */
+	this.userThumb;
+	/** Set styles explictly to avoid inheriting page styles. Disable this to be able to override styles. */
+	this.forceStyles = true;
 	
 	this.switchText = true;
 	this.big = false;
 	this.conversation = null;
+	this.voiceInit = null;
 		
 	/**
 	 * Create an embedding bar and div in the current webpage.
@@ -1045,7 +1286,10 @@ function WebChatbotListener() {
 		var buttonstyle = "";
 		var hidden = "hidden";
 		var border = "";
-		if ((this.background != null) && (!this.backgroundIfNotChrome || !SDK.isChrome())) {
+		if (this.backgroundIfNotChrome && SDK.isChrome()) {
+			this.background = null;
+		}
+		if (this.background != null) {
 			backgroundstyle = " style='background-color:" + this.background + "'";
 			hidden = "visible";
 			border = "border:1px;border-style:solid;border-color:black;";
@@ -1080,46 +1324,71 @@ function WebChatbotListener() {
 			"<style>\n"
 				+ ".box { position:fixed;bottom:10px;right:10px;z-index:52;margin:2px;display:none;" + border + " }\n"
 				+ ".box:hover { border:1px;border-style:solid;border-color:black; }\n"
-				+ ".box .boxmenu { visibility:" + hidden + "; }\n"
+				+ ".boxmenu { visibility:" + hidden + "; margin-bottom:12px; }\n"
 				+ ".box:hover .boxmenu { visibility:visible; }\n"
-				+ "#boxclose, #boxmin, #boxmax { font-size:22px;margin:2px;padding:0px;text-decoration:none; }\n"
-				+ "#boxbarmax { font-size:18px;margin:2px;padding:0px;text-decoration:none; }\n"
-				+ "#boxclose:hover, #boxmin:hover, #boxmax:hover { color: #fff;background: grey; }\n"
+				+ ".boxclose, .boxmin, .boxmax { font-size:22px;margin:2px;padding:0px;text-decoration:none; }\n"
+				+ (this.forceStyles ? "#" : ".") + "boxbarmax { font-size:18px;margin:2px;padding:0px;text-decoration:none;color:white; }\n"
+				+ ".boxclose:hover, .boxmin:hover, .boxmax:hover { color: #fff;background: grey; }\n"
 				+ ".boxbar { position:fixed;bottom:2px;right:30px;z-index:52;margin:0;padding:6px;" + buttonstyle + " }\n"
+				+ ".no-bubble { margin:4px; padding:8px; border:1px; border-style:solid; border-color:black; background-color:white; }\n"
+				+ ".no-bubble-plain { margin:4px; padding:8px; border:1px; }\n"
+				+ ".no-bubble-text { " + responseWidth + "; max-height:100px; overflow:auto; }\n"
+				+ ".boxbutton { width:20px;height:20px;margin2px; }\n"
+				+ ".bubble-div { padding-bottom:15px;position:relative; }\n"
+				+ ".bubble { margin:4px; padding:8px; border:1px; border-style:solid; border-color:black; border-radius:10px; background-color:white; }\n"
+				+ ".bubble-text { " + responseWidth + "; max-height:100px; overflow:auto; }\n"
+				+ ".bubble:before { content:''; position:absolute; bottom:0px; left:40px; border-width:20px 0 0 20px; border-style:solid; border-color:black transparent; display:block; width:0;}\n"
+				+ ".bubble:after { content:''; position:absolute; bottom:3px; left:42px; border-width:18px 0 0 16px; border-style:solid; border-color:white transparent; display:block; width:0;}\n"
+				+ (this.forceStyles ? "#" : ".") + "chat { width:100%;height:22px; }\n"
+				+ ".box-input-span { display:block; overflow:hidden; margin:4px; padding-right:4px; }\n"
+				+ "#boxtable { background:none; border:none; margin:0; }\n"
 			+ "</style>\n"
 			+ "<div id='box' class='box' " + backgroundstyle + ">"
 				+ "<div class='boxmenu'>"
-					+ "<span style='float:right'><a id='boxmin' href='#'>&#95;</a><a id='boxmax' href='#'>&square;</a><a id='boxclose' href='#'>&times;</a></span><br/>"
+					+ "<span style='float:right'><a id='boxmin' class='boxmin' href='#'>&#95;</a><a id='boxmax' class='boxmax' href='#'>&square;</a><a id='boxclose' class='boxclose' href='#'>&times;</a></span><br/>"
 				+ "</div>";
 		
 		if (this.avatar) {
 			html = html
-				+ "<div id='avatar-image-div' style='display:none;" + minHeight + minWidth + "'>"
-					+ "<img id='avatar' style='" + minHeight + minWidth + "'/>"
+				+ "<div id='" + this.elementPrefix + "avatar-image-div' style='display:none;" + minHeight + minWidth + "'>"
+					+ "<img id='" + this.elementPrefix + "avatar' style='" + minHeight + minWidth + "'/>"
 				+ "</div>"
-				+ "<div id='avatar-video-div' style='display:none;" + divHeight + divWidth + background + "background-repeat: no-repeat;'>"
-					+ "<video id='avatar-video' autoplay preload='auto' style='background:transparent;" + minHeight + minWidth + "'>"
+				+ "<div id='" + this.elementPrefix + "avatar-video-div' style='display:none;" + divHeight + divWidth + background + "background-repeat: no-repeat;'>"
+					+ "<video id='" + this.elementPrefix + "avatar-video' autoplay preload='auto' style='background:transparent;" + minHeight + minWidth + "'>"
 						+ "Video format not supported by your browser (try Chrome)"
 					+ "</video>"
+				+ "</div>"
+				+ "<div id='" + this.elementPrefix + "avatar-canvas-div' style='display:none;" + divHeight + divWidth + "'>"
+					+ "<canvas id='" + this.elementPrefix + "avatar-canvas' style='background:transparent;" + minHeight + minWidth + "'>"
+						+ "Canvas not supported by your browser (try Chrome)"
+					+ "</canvas>"
 				+ "</div>";
 		}
+		var urlprefix = this.connection.credentials.url + "/";
 		html = html
 				+ "<div>"
-					+ "<div style='"+ responseWidth + ";max-height:100px;overflow:auto;margin:8px;'>"
-						+ "<span id='response'></span><br/>"
-					+ "</div>"
-					+ "<span style='display:block;overflow:hidden;margin:2px;padding-right:4px'><input id='chat' type='text' style='width:100%'/></span>"
+					+ "<div " + (this.bubble ? "class='bubble-div'" : "") + ">"
+					+ "<div class='" + (this.bubble ? "bubble" : (this.background == null ? "no-bubble" : "no-bubble-plain") ) + "'><div class='" + (this.bubble ? "bubble-text" : "no-bubble-text" ) + "'>"
+						+ "<span id='" + this.elementPrefix + "response'>" + this.greeting + "</span><br/>"
+					+ "</div></div></div>"
+					+ (this.allowSpeech ? "<table id='boxtable' class='boxtable' style='width:100%'><tr><td>" : "")
+					+ "<span class='box-input-span'><input id='" + this.elementPrefix + "chat' type='text' class='box-input'/></span>"
+					+ (this.allowSpeech ?
+						("<td><a href='#' title='Speech'><img id='boxspeak' class='boxbutton' src='"
+								+ urlprefix
+								+ (this.speak ? "images/sound.png": "images/mute.png") +"'></a></td></tr></table>")
+						: "")
 				+ "</div>"
 			+ "</div>"
 			+ "<div id='boxbar' class='boxbar'>"
-				+ "<span><a id='boxbarmax' href='#' style='color:white'>" + this.caption + "</a></span>"
+				+ "<span><a id='boxbarmax' class='boxbarmax' " + (this.forceStyles ? "style='color:white' " : "") + "href='#'>" + this.caption + "</a></span>"
 			+ "</div>";
 		
 		box.innerHTML = html;
 		document.body.appendChild(box);
 		
 		var self = this;
-		document.getElementById("chat").addEventListener("keypress", function(event) {
+		document.getElementById(this.elementPrefix + "chat").addEventListener("keypress", function(event) {
 			if (event.keyCode == 13) {
 				self.sendMessage();
 				return false;
@@ -1139,6 +1408,16 @@ function WebChatbotListener() {
 		});
 		document.getElementById("boxbarmax").addEventListener("click", function() {
 			self.maximizeBox();
+			return false;
+		});
+		document.getElementById("boxspeak").addEventListener("click", function() {
+			self.speak = !self.speak;
+			var urlprefix = self.connection.credentials.url + "/";
+			if (self.speak) {
+				document.getElementById("boxspeak").src = urlprefix + "images/sound.png";
+			} else {
+				document.getElementById("boxspeak").src = urlprefix + "images/mute.png";				
+			}
 			return false;
 		});
 	}
@@ -1161,10 +1440,10 @@ function WebChatbotListener() {
 		var html =
 			"<style>\n"
 				+ ".livechatboxbar { position:fixed;bottom:2px;" + position + ";z-index:52;margin:0;padding:6px;" + buttonstyle + " }\n"
-				+ "#livechatboxmax { font-size:18px;margin:2px;padding:0px;text-decoration:none; }\n"
+				+ (this.forceStyles ? "#" : ".") + "livechatboxmax { color:white;font-size:18px;margin:2px;padding:0px;text-decoration:none; }\n"
 			+ "</style>\n"
 			+ "<div id='livechatboxbar' class='livechatboxbar'>"
-			+ "<span><a id='livechatboxmax' href='#' style='color:white'>" + label + "</a></span>"
+			+ "<span><a id='livechatboxmax' class='livechatboxmax' href='#'>" + label + "</a></span>"
 			+ "</div>";
 		
 		box.innerHTML = html;
@@ -1236,10 +1515,50 @@ function WebChatbotListener() {
 		}
 		if (this.popupURL != null) {
 			SDK.popupwindow(this.popupURL,'child', 700, height);
-		} else {
-			SDK.popupwindow(SDK.url + '/chat?id=' + this.instance + '&embedded&speak=' + speech + "&avatar=" + this.avatar + '&application=' + this.connection.credentials.applicationId ,'child', 700, height);
+		} else {			
+			var form = document.createElement("form");
+            form.setAttribute("method", "post");
+            form.setAttribute("action", SDK.url + "/chat");
+            form.setAttribute("target", 'child');
+ 
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = "id";
+            input.value = this.instance;
+            form.appendChild(input);
+ 
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = "embedded";
+            input.value = "embedded";
+            form.appendChild(input);
+ 
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = "speak";
+            input.value = speech;
+            form.appendChild(input);
+ 
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = "avatar";
+            input.value = this.avatar;
+            form.appendChild(input);
+ 
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = "application";
+            input.value = this.connection.credentials.applicationId;
+            form.appendChild(input);
+            
+            document.body.appendChild(form);
+            
+			SDK.popupwindow('','child', 700, height);
+			
+			form.submit();
+            document.body.removeChild(form);
 		}
-		this.exit();
+		this.minimizeBox();
 		return false;
 	}
 	
@@ -1247,10 +1566,10 @@ function WebChatbotListener() {
 	 * A chat message was received from the bot.
 	 */
 	this.response = function(user, message) {
-		document.getElementById('response').innerHTML = SDK.linkURLs(message);
+		document.getElementById(this.elementPrefix + 'response').innerHTML = SDK.linkURLs(message);
 		this.message(user, message);
 		if (this.focus) {
-			document.getElementById('chat').focus();
+			document.getElementById(this.elementPrefix + 'chat').focus();
 		}
 		if (this.onresponse != null) {
 			this.onresponse(message);
@@ -1262,8 +1581,8 @@ function WebChatbotListener() {
 	 */
 	this.message = function(user, message) {
 		var speaker = user;
-		var scroller = document.getElementById('scroller');
-		var chatconsole = document.getElementById('console');
+		var scroller = document.getElementById(this.elementPrefix + 'scroller');
+		var chatconsole = document.getElementById(this.elementPrefix + 'console');
 		if (scroller == null || chatconsole == null) {
 			return;
 		}
@@ -1271,14 +1590,27 @@ function WebChatbotListener() {
 		var td = document.createElement('td');
 		var tr2 = document.createElement('tr');
 		var td2 = document.createElement('td');
-		var span = document.createElement('span');
 		var span2 = document.createElement('span');
 		var chatClass = 'chat-1';
 		if (this.switchText) {
 			chatClass = 'chat-2';
 		}
-		span.className = chatClass;
-		span.innerHTML = speaker;
+		if (this.botThumb == null || this.userThumb == null) {
+			var span = document.createElement('span');
+			span.className = chatClass;
+			span.innerHTML = speaker;
+			td.appendChild(span);
+		} else {
+			var img = document.createElement('img');
+			img.className = 'chat-user';
+			img.setAttribute('alt', speaker);
+			if (user == this.userName) {
+				img.setAttribute('src', this.userThumb);
+			} else {
+				img.setAttribute('src', this.botThumb);
+			}
+			td.appendChild(img);			
+		}
 		span2.className = chatClass;
 		span2.innerHTML = SDK.linkURLs(message);
 		td.className = 'chat-user';
@@ -1288,7 +1620,6 @@ function WebChatbotListener() {
 		td2.setAttribute('width', '100%');
 		chatconsole.appendChild(tr);
 		tr.appendChild(td);
-		td.appendChild(span);
 		tr.appendChild(td2);
 		td2.appendChild(span2);
 		this.switchText = !this.switchText;
@@ -1303,7 +1634,7 @@ function WebChatbotListener() {
 	 */
 	this.updateAvatar = function(responseMessage) {
 		var urlprefix = this.connection.credentials.url + "/";
-		SDK.updateAvatar(responseMessage, this.speak, urlprefix);
+		SDK.updateAvatar(responseMessage, this.speak, urlprefix, this.elementPrefix, null, null, this.nativeVoice, this.lang, this.nativeVoiceName);
 	};
 
 	this.toggleSpeak = function() {
@@ -1344,7 +1675,7 @@ function WebChatbotListener() {
 	 * Send the current text from the chat input as a message to the bot, and process the response.
 	 */
 	this.sendMessage = function() {
-		var message = document.getElementById('chat').value;
+		var message = document.getElementById(this.elementPrefix + 'chat').value;
 		if (message != '') {
 			this.message(this.userName, message);
 			var chat = new ChatConfig();
@@ -1385,8 +1716,8 @@ function WebChatbotListener() {
 				action.value = "";
 			}
 			var self = this;
-			document.getElementById('response').innerHTML = '<i>thinking</i>';
-			document.getElementById('chat').value = '';
+			document.getElementById(this.elementPrefix + 'response').innerHTML = '<i>thinking</i>';
+			document.getElementById(this.elementPrefix + 'chat').value = '';
 			this.connection.chat(chat, function(responseMessage) {
 				self.conversation = responseMessage.conversation;
 				self.response(self.instanceName, responseMessage.message);
@@ -1414,7 +1745,6 @@ function WebChatbotListener() {
 		chat.conversation = this.conversation;
 		var self = this;
 		this.connection.chat(chat, function(responseMessage) {
-			self.connection.disconnect();
 			self.clear();
 			self.conversation = null;
 		});
@@ -1425,8 +1755,8 @@ function WebChatbotListener() {
 	 * Clear the chat console.
 	 */
 	this.clear = function() {
-		document.getElementById('response').innerHTML = '';
-		var console = document.getElementById('console');
+		document.getElementById(this.elementPrefix + 'response').innerHTML = '';
+		var console = document.getElementById(this.elementPrefix + 'console');
 		if (console != null) {
 			console.innerHTML = '';
 		}
@@ -1434,22 +1764,52 @@ function WebChatbotListener() {
 	};
 
 	this.resizeAvatar = function () {
-		var avatar = document.getElementById("avatar");
-		var avatarDiv = document.getElementById("avatar-image-div");
-		var avatarVideo = document.getElementById("avatar-video");
-		var avatarVideoDiv = document.getElementById("avatar-video-div");
-		var scroller = document.getElementById("scroller");
+		var avatar = document.getElementById(this.elementPrefix + "avatar");
+		var avatarDiv = document.getElementById(this.elementPrefix + "avatar-image-div");
+		var avatarVideo = document.getElementById(this.elementPrefix + "avatar-video");
+		var avatarVideoDiv = document.getElementById(this.elementPrefix + "avatar-video-div");
+		var avatarCanvas = document.getElementById(this.elementPrefix + "avatar-canvas");
+		var avatarCanvasDiv = document.getElementById(this.elementPrefix + "avatar-canvas-div");
+		var scroller = document.getElementById(this.elementPrefix + "scroller");
 		if (!this.big) {
-			avatar.className = "avatar-big";
-			avatarVideo.className = "avatar-video-big";
-			avatarVideoDiv.className = "avatar-video-div-big";
-			scroller.style.display = "none";
+			if (avatar != null) {
+				avatar.className = "avatar-big";
+			}
+			if (avatarVideo != null) {
+				avatarVideo.className = "avatar-video-big";
+			}
+			if (avatarVideoDiv != null) {
+				avatarVideoDiv.className = "avatar-video-div-big";
+			}
+			if (avatarCanvas != null) {
+				avatarCanvas.className = "avatar-canvas-big";
+			}
+			if (avatarCanvasDiv != null) {
+				avatarCanvasDiv.className = "avatar-canvas-div-big";
+			}
+			if (scroller != null) {
+				scroller.style.display = "none";
+			}
 			this.big = true;
 		} else {
-			avatar.className = "avatar";
-			avatarVideo.className = "avatar-video";
-			avatarVideoDiv.className = "avatar-video-div";
-			scroller.style.display = "inline-block";
+			if (avatar != null) {
+				avatar.className = "avatar";
+			}
+			if (avatarVideo != null) {
+				avatarVideo.className = "avatar-video";
+			}
+			if (avatarVideoDiv != null) {
+				avatarVideoDiv.className = "avatar-video-div";
+			}
+			if (avatarCanvas != null) {
+				avatarCanvas.className = "avatar-canvas";
+			}
+			if (avatarCanvasDiv != null) {
+				avatarCanvasDiv.className = "avatar-canvas-div";
+			}
+			if (scroller != null) {
+				scroller.style.display = "inline-block";
+			}
 			this.big = false;
 		}
 		return false;
@@ -1472,6 +1832,12 @@ function WebChatbotListener() {
 function WebAvatar() {
 	/** Enable or disable speech. */
 	this.speak = true;
+	/** Configure if the browser's native voice TTS should be used. */
+	this.nativeVoice = false;
+	/** Set the language for the native voice. */
+	this.lang = null;
+	/** Set the voice for the native voice. */
+	this.nativeVoiceName = null;
 	/** An SDK connection object must be set. */
 	this.connection = null;
 	/** The id or name of the avatar object to use. */
@@ -1542,18 +1908,21 @@ function WebAvatar() {
 			+ "</style>\n"
 			+ "<div id='avatarbox' class='avatarbox' " + backgroundstyle + ">"
 				+ "<div class='avatarboxmenu'>"
-				+ "<span style='float:right'><a id='avatarboxclose' href='#'>&times;</a></span><br/>"
+					+ "<span style='float:right'><a id='avatarboxclose' href='#'>&times;</a></span><br/>"
 				+ "</div>"
-
 				+ "<div id='" + this.elementPrefix + "avatar-image-div' style='display:none;" + minWidth + minHeight + "'>"
 					+ "<img id='" + this.elementPrefix + "avatar' style='" + minWidth + minHeight + "'/>"
-					+ "</div>"
-					+ "<div id='" + this.elementPrefix + "avatar-video-div' style='display:none;" + divWidth + divHeight + background + "background-repeat: no-repeat;'>"
+				+ "</div>"
+				+ "<div id='" + this.elementPrefix + "avatar-video-div' style='display:none;" + divWidth + divHeight + background + "background-repeat: no-repeat;'>"
 					+ "<video id='" + this.elementPrefix + "avatar-video' autoplay preload='auto' style='background:transparent;" + minWidth + minHeight + "'>"
-					+ "Video format not supported by your browser (try Chrome)"
+						+ "Video format not supported by your browser (try Chrome)"
 					+ "</video>"
 				+ "</div>"
-				
+				+ "<div id='" + this.elementPrefix + "avatar-canvas-div' style='display:none;" + divWidth + divHeight + "'>"
+					+ "<canvas id='" + this.elementPrefix + "avatar-canvas' style='background:transparent;" + minWidth + minHeight + "'>"
+						+ "Canvas not supported by your browser (try Chrome)"
+					+ "</canvas>"
+				+ "</div>"				
 			+ "</div>";
 		
 		box.innerHTML = html;
@@ -1591,11 +1960,11 @@ function WebAvatar() {
 	}
 
 	/**
-	 * Update the bot's avatar's image/video/audio from the chat response.
+	 * Update the avatar's image/video/audio from the message response.
 	 */
 	this.updateAvatar = function(responseMessage, afterFunction) {
 		var urlprefix = this.connection.credentials.url + "/";
-		SDK.updateAvatar(responseMessage, this.speak, urlprefix, this.elementPrefix, false, afterFunction);
+		SDK.updateAvatar(responseMessage, this.speak, urlprefix, this.elementPrefix, false, afterFunction, this.nativeVoice, this.lang, this.nativeVoiceName);
 	};
 	
 	/**
@@ -1606,8 +1975,12 @@ function WebAvatar() {
 		var config = new AvatarMessage();
 		config.message = message;
 		config.avatar = this.avatar;
-		config.speak = this.speak;
-		config.voice = this.voice;
+		if (this.nativeVoice && ('speechSynthesis' in window)) {
+			config.speak = false;
+		} else {
+			config.speak = this.speak;
+			config.voice = this.voice;
+		}
 		config.emote = emote;
 		config.action = action;
 		config.pose = pose;
@@ -1653,8 +2026,12 @@ function WebAvatar() {
 		var config = new AvatarMessage();
 		config.message = message;
 		config.avatar = this.avatar;
-		config.speak = this.speak;
-		config.voice = this.voice;
+		if (this.nativeVoice && ('speechSynthesis' in window)) {
+			config.speak = false;
+		} else {
+			config.speak = this.speak;
+			config.voice = this.voice;
+		}
 		config.emote = emote;
 		config.action = action;
 		config.pose = pose;
@@ -2980,7 +3357,7 @@ function UserConfig() {
 		
 		if (this.bio != null) {
 			xml = xml + ("<bio>");
-			xml = xml + (this.bio);
+			xml = xml + (SDK.escapeHTML(this.bio));
 			xml = xml + ("</bio>");
 		}
 		xml = xml + ("</user>");
@@ -3054,7 +3431,7 @@ function ChatConfig() {
 		
 		if (this.message != null) {
 			xml = xml + ("<message>");
-			xml = xml + (this.message);
+			xml = xml + (SDK.escapeHTML(this.message));
 			xml = xml + ("</message>");
 		}
 		xml = xml + ("</chat>");
@@ -3200,7 +3577,7 @@ function AvatarMessage() {
 		
 		if (this.message != null) {
 			xml = xml + ("<message>");
-			xml = xml + (this.message);
+			xml = xml + (SDK.escapeHTML(this.message));
 			xml = xml + ("</message>");
 		}
 		xml = xml + ("</avatar-message>");
@@ -3334,12 +3711,12 @@ function WebMediumConfig() {
 		xml = xml + (">");
 		if (this.description != null) {
 			xml = xml + ("<description>");
-			xml = xml + (this.description);
+			xml = xml + (SDK.escapeHTML(this.description));
 			xml = xml + ("</description>");
 		}
 		if (this.details != null) {
 			xml = xml + ("<details>");
-			xml = xml + (this.details);
+			xml = xml + (SDK.escapeHTML(this.details));
 			xml = xml + ("</details>");
 		}
 		if (this.disclaimer != null) {
@@ -3349,22 +3726,22 @@ function WebMediumConfig() {
 		}
 		if (this.categories != null) {
 			xml = xml + ("<categories>");
-			xml = xml + (this.categories);
+			xml = xml + (SDK.escapeHTML(this.categories));
 			xml = xml + ("</categories>");
 		}
 		if (this.tags != null) {
 			xml = xml + ("<tags>");
-			xml = xml + (this.tags);
+			xml = xml + (SDK.escapeHTML(this.tags));
 			xml = xml + ("</tags>");
 		}
 		if (this.license != null) {
 			xml = xml + ("<license>");
-			xml = xml + (this.license);
+			xml = xml + (SDK.escapeHTML(this.license));
 			xml = xml + ("</license>");
 		}
 		if (this.flaggedReason != null) {
 			xml = xml + ("<flaggedReason>");
-			xml = xml + (this.flaggedReason);
+			xml = xml + (SDK.escapeHTML(this.flaggedReason));
 			xml = xml + ("</flaggedReason>");
 		}
 		return xml;
@@ -3646,20 +4023,17 @@ function ForumPostConfig() {
 		xml = xml + (">");
 		if (this.topic != null) {
 			xml = xml + ("<topic>");
-			xml = xml + (this.topic);
+			xml = xml + (SDK.escapeHTML(this.topic));
 			xml = xml + ("</topic>");
 		}
 		if (this.details != null) {
-			var text = this.details;
-			text = text.replace("<", "&lt;");
-			text = text.replace(">", "&gt;");
 			xml = xml + ("<details>");
-			xml = xml + (text);
+			xml = xml + (SDK.escapeHTML(this.details));
 			xml = xml + ("</details>");
 		}
 		if (this.tags != null) {
 			xml = xml + ("<tags>");
-			xml = xml + (this.tags);
+			xml = xml + (SDK.escapeHTML(this.tags));
 			xml = xml + ("</tags>");
 		}
 		xml = xml + ("</forum-post>");
@@ -3909,12 +4283,12 @@ function TrainingConfig() {
 		xml = xml + (">");
 		if (this.question != null) {
 			xml = xml + ("<question>");
-			xml = xml + (this.question);
+			xml = xml + (SDK.escapeHTML(this.question));
 			xml = xml + ("</question>");
 		}
 		if (this.response != null) {
 			xml = xml + ("<response>");
-			xml = xml + (this.response);
+			xml = xml + (SDK.escapeHTML(this.response));
 			xml = xml + ("</response>");
 		}
 		xml = xml + ("</training>");
@@ -3926,3 +4300,10 @@ function TrainingConfig() {
 TrainingConfig.prototype = new Config();
 TrainingConfig.prototype.constructor = TrainingConfig;
 TrainingConfig.constructor = TrainingConfig;
+
+/**
+ * Allow async loading callback.
+ */
+if (typeof SDK_onLoaded !== 'undefined') {
+	SDK_onLoaded();
+}
